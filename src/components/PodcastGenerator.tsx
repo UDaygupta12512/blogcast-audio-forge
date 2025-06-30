@@ -19,27 +19,71 @@ const PodcastGenerator = () => {
   const handleBlogSubmit = async (blogContent: string, blogUrl: string) => {
     setStep('processing');
     
-    // Extract title from blog content (simple approach)
+    // Extract title from blog content
     const lines = blogContent.split('\n').filter(line => line.trim());
     const title = lines[0]?.replace(/^#+\s*/, '') || 'Generated Podcast';
     
-    // Simulate script generation (in real app, this would call AI API)
+    // Generate more dynamic script based on content
     setTimeout(() => {
-      const script = generateScript(blogContent);
+      const script = generateEnhancedScript(blogContent, title);
       setPodcastData({
         title,
         script,
-        audioUrl: '/api/placeholder-audio.mp3', // Placeholder
-        duration: '5:32'
+        audioUrl: '/api/placeholder-audio.mp3',
+        duration: calculateDuration(script)
       });
       setStep('complete');
     }, 5000);
   };
 
-  const generateScript = (content: string): string => {
-    // Simple script generation for demo
-    const words = content.split(' ').slice(0, 100);
-    return `Welcome to today's podcast episode. ${words.join(' ')}... And that wraps up today's discussion. Thank you for listening!`;
+  const generateEnhancedScript = (content: string, title: string): string => {
+    // Extract key sections and create a more engaging script
+    const sections = content.split('##').filter(section => section.trim());
+    const mainContent = sections[0]?.replace(/^#+\s*.*\n/, '').trim() || content.substring(0, 500);
+    
+    // Create introduction based on title
+    const intro = `Welcome to today's podcast episode: "${title}". I'm excited to share some fascinating insights with you today.`;
+    
+    // Extract key points
+    const keyPoints = sections.slice(1).map(section => {
+      const sectionTitle = section.split('\n')[0]?.trim();
+      const sectionContent = section.split('\n').slice(1).join(' ').substring(0, 200);
+      return { title: sectionTitle, content: sectionContent };
+    });
+    
+    // Build script with transitions
+    let script = intro + '\n\n';
+    
+    if (keyPoints.length > 0) {
+      script += "Let's dive into the main topics we'll be covering today.\n\n";
+      
+      keyPoints.forEach((point, index) => {
+        if (point.title) {
+          script += `First, let's talk about ${point.title.toLowerCase()}. `;
+        }
+        script += point.content.trim() + '\n\n';
+        
+        if (index < keyPoints.length - 1) {
+          script += "Moving on to our next point... ";
+        }
+      });
+    } else {
+      // Fallback for content without clear sections
+      const words = mainContent.split(' ').slice(0, 150);
+      script += words.join(' ') + '...\n\n';
+    }
+    
+    script += "That brings us to the end of today's discussion. Thank you for listening, and I hope you found these insights valuable. Until next time!";
+    
+    return script;
+  };
+
+  const calculateDuration = (script: string): string => {
+    // Estimate duration based on script length (average 150 words per minute)
+    const wordCount = script.split(' ').length;
+    const minutes = Math.ceil(wordCount / 150);
+    const seconds = Math.floor((wordCount % 150) / 2.5);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const resetGenerator = () => {
