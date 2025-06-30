@@ -1,8 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Play, Pause, Download, Share2, RotateCcw, Volume2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PodcastData } from './PodcastGenerator';
@@ -15,45 +14,79 @@ interface AudioPlayerProps {
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateDuration = () => setDuration(audio.duration);
+    const handleEnded = () => setIsPlaying(false);
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', updateDuration);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', updateDuration);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [podcastData.audioUrl]);
+
   const togglePlayback = () => {
-    setIsPlaying(!isPlaying);
-    
-    if (!isPlaying) {
-      // Simulate playback progress
-      const interval = setInterval(() => {
-        setCurrentTime((prev) => {
-          if (prev >= 332) { // 5:32 in seconds
-            clearInterval(interval);
-            setIsPlaying(false);
-            return 0;
-          }
-          return prev + 1;
-        });
-      }, 1000);
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+    } else {
+      audio.play();
     }
+    setIsPlaying(!isPlaying);
   };
 
   const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const handleDownload = () => {
-    toast({
-      title: "Download Started",
-      description: "Your podcast episode is being prepared for download.",
-    });
+    if (podcastData.audioUrl) {
+      const link = document.createElement('a');
+      link.href = podcastData.audioUrl;
+      link.download = `${podcastData.title}.mp3`;
+      link.click();
+      
+      toast({
+        title: "Download Started",
+        description: "Your podcast episode is being downloaded.",
+      });
+    }
   };
 
   const handleShare = () => {
-    toast({
-      title: "Share Link Copied",
-      description: "Podcast share link has been copied to your clipboard.",
-    });
+    if (podcastData.audioUrl) {
+      navigator.clipboard.writeText(podcastData.audioUrl);
+      toast({
+        title: "Audio URL Copied",
+        description: "Audio URL has been copied to your clipboard.",
+      });
+    }
   };
+
+  if (!podcastData.audioUrl) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-muted-foreground">Audio is being generated...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -64,11 +97,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         </p>
       </div>
 
+      <audio ref={audioRef} src={podcastData.audioUrl} preload="metadata" />
+
       <Card className="p-6 bg-gradient-to-br from-purple-900/20 to-blue-900/20 border-purple-500/20">
         <div className="space-y-4">
           <div className="text-center">
             <h4 className="text-lg font-semibold text-purple-200">{podcastData.title}</h4>
-            <p className="text-sm text-muted-foreground">Duration: {podcastData.duration}</p>
+            <p className="text-sm text-muted-foreground">Duration: {formatTime(duration)}</p>
           </div>
 
           <div className="flex items-center justify-center">
@@ -93,12 +128,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>{formatTime(currentTime)}</span>
-              <span>{podcastData.duration}</span>
+              <span>{formatTime(duration)}</span>
             </div>
             <div className="w-full bg-muted rounded-full h-2">
               <div 
                 className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(currentTime / 332) * 100}%` }}
+                style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
               />
             </div>
           </div>
