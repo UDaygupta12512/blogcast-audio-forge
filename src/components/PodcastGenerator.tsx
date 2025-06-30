@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import BlogInput from './BlogInput';
 import ProcessingSteps from './ProcessingSteps';

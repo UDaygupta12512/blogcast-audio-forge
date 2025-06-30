@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -48,6 +47,18 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
         source: blogUrl
       });
       
+      // Set the suggested voice based on content type
+      setSelectedVoice(content.suggestedVoice);
+      
+      // Set music based on content type
+      const musicMap = {
+        tech: 'ambient-tech',
+        health: 'nature-calm',
+        business: 'corporate-upbeat',
+        general: 'cinematic-inspiring'
+      };
+      setSelectedMusic(musicMap[content.contentType] || 'ambient-tech');
+      
       setIsLoading(false);
     } catch (error) {
       setIsLoading(false);
@@ -73,15 +84,35 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
     const title = lines[0]?.replace(/^#+\s*/, '') || 'Generated Podcast';
     const wordCount = blogText.split(' ').length;
     
+    // Detect content type from text
+    const text = blogText.toLowerCase();
+    let contentType: 'tech' | 'health' | 'business' | 'general' = 'general';
+    let suggestedVoice = 'aria';
+    
+    if (text.includes('ai') || text.includes('technology') || text.includes('programming')) {
+      contentType = 'tech';
+      suggestedVoice = 'charlie';
+    } else if (text.includes('health') || text.includes('medical') || text.includes('wellness')) {
+      contentType = 'health';
+      suggestedVoice = 'laura';
+    } else if (text.includes('business') || text.includes('startup') || text.includes('entrepreneur')) {
+      contentType = 'business';
+      suggestedVoice = 'george';
+    }
+    
     setParsedContent({
       title,
       content: blogText,
+      contentType,
+      suggestedVoice,
       metadata: {
         wordCount,
         readingTime: `${Math.ceil(wordCount / 200)} min read`,
       },
       source: 'Direct input'
     });
+    
+    setSelectedVoice(suggestedVoice);
   };
 
   const handleGeneratePodcast = () => {

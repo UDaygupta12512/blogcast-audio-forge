@@ -2,6 +2,8 @@
 export interface ParsedContent {
   title: string;
   content: string;
+  contentType: 'tech' | 'health' | 'business' | 'general';
+  suggestedVoice: string;
   metadata: {
     wordCount: number;
     readingTime: string;
@@ -16,8 +18,12 @@ export const parseUrlContent = async (url: string): Promise<ParsedContent> => {
   
   let baseContent = '';
   let title = '';
+  let contentType: 'tech' | 'health' | 'business' | 'general' = 'general';
+  let suggestedVoice = 'aria';
   
   if (domain.includes('tech') || domain.includes('ai') || domain.includes('artificial')) {
+    contentType = 'tech';
+    suggestedVoice = 'charlie'; // Energetic voice for tech content
     title = 'The Future of Artificial Intelligence in Modern Technology';
     baseContent = `Artificial Intelligence is rapidly transforming our world in ways we never imagined. From healthcare to transportation, AI is revolutionizing industries and changing how we live and work.
 
@@ -29,6 +35,8 @@ As we move forward, the integration of AI into our daily lives will only continu
 
 The key is to harness AI's power while maintaining human oversight and ethical standards. We must ensure that as AI becomes more prevalent, it serves to augment human capabilities rather than replace human judgment and creativity.`;
   } else if (domain.includes('health') || domain.includes('medical') || domain.includes('wellness')) {
+    contentType = 'health';
+    suggestedVoice = 'laura'; // Calm voice for health content
     title = 'Revolutionary Approaches to Modern Healthcare';
     baseContent = `Healthcare is undergoing a digital transformation that promises to improve patient outcomes and reduce costs. From telemedicine to AI-powered diagnostics, technology is reshaping how we approach medical care.
 
@@ -40,6 +48,8 @@ Telemedicine has broken down geographical barriers, making quality healthcare ac
 
 Artificial intelligence is also playing a crucial role in diagnostics, with AI systems now able to detect diseases like cancer earlier and more accurately than traditional methods. This early detection capability can save countless lives and reduce treatment costs significantly.`;
   } else if (domain.includes('business') || domain.includes('startup') || domain.includes('entrepreneur')) {
+    contentType = 'business';
+    suggestedVoice = 'george'; // Professional voice for business content
     title = 'Building Successful Startups in the Digital Age';
     baseContent = `The entrepreneurial landscape has evolved dramatically in recent years. Today's successful startups leverage technology, data, and innovative business models to create value and scale rapidly.
 
@@ -53,6 +63,8 @@ Access to funding has never been more diverse, with traditional VCs, angel inves
 
 The most successful startups of today are those that solve real problems with innovative solutions, maintain a strong focus on user experience, and build sustainable business models that can weather economic uncertainties.`;
   } else {
+    contentType = 'general';
+    suggestedVoice = 'aria'; // Default voice for general content
     title = 'Exploring New Horizons in Digital Innovation';
     baseContent = `The digital landscape continues to evolve at an unprecedented pace, bringing new opportunities and challenges for individuals and organizations alike.
 
@@ -73,6 +85,8 @@ The democratization of technology tools means that individuals and small teams c
   return {
     title,
     content: baseContent,
+    contentType,
+    suggestedVoice,
     metadata: {
       wordCount,
       readingTime: `${readingTime} min read`,
