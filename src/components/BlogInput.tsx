@@ -7,100 +7,23 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LinkIcon, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { parseUrlContent, cleanContent } from '../utils/contentParser';
+import ContentCleaner from './ContentCleaner';
+import VoiceSelector from './VoiceSelector';
+import MusicSelector from './MusicSelector';
 
 interface BlogInputProps {
-  onSubmit: (content: string, source: string) => void;
+  onSubmit: (content: any, options: any) => void;
 }
 
 const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
   const [blogUrl, setBlogUrl] = useState('');
   const [blogText, setBlogText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [parsedContent, setParsedContent] = useState<any>(null);
+  const [selectedVoice, setSelectedVoice] = useState('aria');
+  const [selectedMusic, setSelectedMusic] = useState('ambient-tech');
   const { toast } = useToast();
-
-  const generateMockContent = (url: string): string => {
-    // Generate different content based on URL patterns
-    const domain = url.toLowerCase();
-    
-    if (domain.includes('tech') || domain.includes('ai') || domain.includes('artificial')) {
-      return `# The Future of Artificial Intelligence in Modern Technology
-
-Artificial Intelligence is rapidly transforming our world in ways we never imagined. From healthcare to transportation, AI is revolutionizing industries and changing how we live and work.
-
-## Breakthrough Developments
-
-Recent breakthroughs in machine learning have made AI more accessible and powerful than ever before. Natural language processing has reached new heights, enabling more human-like interactions between machines and humans.
-
-The integration of AI into everyday applications has accelerated dramatically, with new tools emerging that can write code, create art, and even compose music.
-
-## Looking Forward
-
-As we move forward, the integration of AI into our daily lives will only continue to grow. The possibilities are endless, and we're just beginning to scratch the surface of what's possible.
-
-This transformation brings both opportunities and challenges that we must navigate carefully as a society. The key is to harness AI's power while maintaining human oversight and ethical standards.`;
-    }
-    
-    if (domain.includes('health') || domain.includes('medical') || domain.includes('wellness')) {
-      return `# Revolutionary Approaches to Modern Healthcare
-
-Healthcare is undergoing a digital transformation that promises to improve patient outcomes and reduce costs. From telemedicine to AI-powered diagnostics, technology is reshaping how we approach medical care.
-
-## Digital Health Solutions
-
-Wearable devices and mobile health apps are empowering patients to take control of their health like never before. These tools provide real-time monitoring and personalized insights that help prevent illness before it starts.
-
-## Personalized Medicine
-
-The future of healthcare lies in personalized treatment plans based on individual genetic profiles and lifestyle factors. This approach ensures that each patient receives the most effective care tailored to their unique needs.
-
-## Accessibility and Innovation
-
-Telemedicine has broken down geographical barriers, making quality healthcare accessible to remote and underserved communities. This democratization of healthcare is one of the most significant advances in modern medicine.`;
-    }
-    
-    if (domain.includes('business') || domain.includes('startup') || domain.includes('entrepreneur')) {
-      return `# Building Successful Startups in the Digital Age
-
-The entrepreneurial landscape has evolved dramatically in recent years. Today's successful startups leverage technology, data, and innovative business models to create value and scale rapidly.
-
-## Key Success Factors
-
-Modern startups must focus on customer validation, lean operations, and rapid iteration. The days of building in isolation are over – today's entrepreneurs must engage with their market from day one.
-
-## Technology as an Enabler
-
-Cloud computing, artificial intelligence, and mobile technology have lowered the barriers to entry for new businesses. Small teams can now build and scale applications that reach millions of users.
-
-## The Importance of Culture
-
-Building a strong company culture from the beginning is crucial for long-term success. Teams that share common values and vision are more likely to overcome challenges and achieve their goals.
-
-## Funding and Growth
-
-Access to funding has never been more diverse, with traditional VCs, angel investors, crowdfunding, and government grants all providing pathways for startup financing.`;
-    }
-    
-    // Default content for other URLs
-    return `# Exploring New Horizons in Digital Innovation
-
-The digital landscape continues to evolve at an unprecedented pace, bringing new opportunities and challenges for individuals and organizations alike.
-
-## Innovation Drivers
-
-Technology advancement is accelerating across multiple domains, creating new possibilities for solving complex problems and improving quality of life.
-
-## Industry Transformation
-
-Traditional industries are being disrupted by digital-first approaches that prioritize user experience, efficiency, and sustainability.
-
-## Future Outlook
-
-The next decade promises even more dramatic changes as emerging technologies mature and converge to create entirely new categories of products and services.
-
-## Adaptation Strategies
-
-Success in this rapidly changing environment requires continuous learning, flexibility, and a willingness to embrace new approaches to traditional challenges.`;
-  };
 
   const handleUrlSubmit = async () => {
     if (!blogUrl.trim()) {
@@ -114,12 +37,26 @@ Success in this rapidly changing environment requires continuous learning, flexi
 
     setIsLoading(true);
     
-    // Simulate content extraction with different content based on URL
-    setTimeout(() => {
-      const mockContent = generateMockContent(blogUrl);
+    try {
+      // Parse content from URL
+      const content = await parseUrlContent(blogUrl);
+      const cleanedContent = cleanContent(content.content);
+      
+      setParsedContent({
+        ...content,
+        content: cleanedContent,
+        source: blogUrl
+      });
+      
       setIsLoading(false);
-      onSubmit(mockContent, blogUrl);
-    }, 2000);
+    } catch (error) {
+      setIsLoading(false);
+      toast({
+        title: "Error",
+        description: "Failed to extract content from URL",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleTextSubmit = () => {
@@ -132,8 +69,77 @@ Success in this rapidly changing environment requires continuous learning, flexi
       return;
     }
 
-    onSubmit(blogText, 'Direct input');
+    const lines = blogText.split('\n').filter(line => line.trim());
+    const title = lines[0]?.replace(/^#+\s*/, '') || 'Generated Podcast';
+    const wordCount = blogText.split(' ').length;
+    
+    setParsedContent({
+      title,
+      content: blogText,
+      metadata: {
+        wordCount,
+        readingTime: `${Math.ceil(wordCount / 200)} min read`,
+      },
+      source: 'Direct input'
+    });
   };
+
+  const handleGeneratePodcast = () => {
+    const options = {
+      voice: selectedVoice,
+      music: selectedMusic,
+      tone: 'professional',
+      includeIntro: true,
+      includeOutro: true,
+      maxDuration: 10
+    };
+    
+    onSubmit(parsedContent, options);
+  };
+
+  if (parsedContent) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h3 className="text-2xl font-semibold mb-2">Configure Your Podcast</h3>
+          <p className="text-muted-foreground">
+            Customize voice and music settings for your episode
+          </p>
+        </div>
+
+        <ContentCleaner
+          originalContent={parsedContent.content}
+          cleanedContent={parsedContent.content}
+          metadata={parsedContent.metadata}
+        />
+
+        <VoiceSelector
+          selectedVoice={selectedVoice}
+          onVoiceChange={setSelectedVoice}
+        />
+
+        <MusicSelector
+          selectedTrack={selectedMusic}
+          onTrackChange={setSelectedMusic}
+        />
+
+        <div className="flex gap-3 justify-center">
+          <Button
+            onClick={() => setParsedContent(null)}
+            variant="outline"
+          >
+            Back to Input
+          </Button>
+          <Button
+            onClick={handleGeneratePodcast}
+            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+          >
+            Generate Podcast
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -179,7 +185,7 @@ Success in this rapidly changing environment requires continuous learning, flexi
                 Extracting Content...
               </>
             ) : (
-              'Extract & Generate Podcast'
+              'Extract Content'
             )}
           </Button>
         </TabsContent>
@@ -200,7 +206,7 @@ Success in this rapidly changing environment requires continuous learning, flexi
             onClick={handleTextSubmit}
             className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
           >
-            Generate Podcast
+            Process Content
           </Button>
         </TabsContent>
       </Tabs>
