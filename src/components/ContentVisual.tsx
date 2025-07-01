@@ -17,7 +17,9 @@ const ContentVisual: React.FC<ContentVisualProps> = ({ contentType, title }) => 
           gradient: 'from-blue-400 via-purple-500 to-cyan-400',
           bgPattern: 'tech-pattern',
           particles: ['💻', '🤖', '⚡', '🔧', '💡'],
-          description: 'Technology & Innovation'
+          description: 'Technology & Innovation',
+          bgImage: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
+          altText: 'Circuit board technology background'
         };
       case 'health':
         return {
@@ -26,7 +28,9 @@ const ContentVisual: React.FC<ContentVisualProps> = ({ contentType, title }) => 
           gradient: 'from-green-400 via-emerald-500 to-teal-400',
           bgPattern: 'health-pattern',
           particles: ['🏥', '💊', '🔬', '🩺', '❤️'],
-          description: 'Health & Wellness'
+          description: 'Health & Wellness',
+          bgImage: 'https://images.unsplash.com/photo-1500673922987-e212871fec22?auto=format&fit=crop&w=800&q=80',
+          altText: 'Peaceful wellness background'
         };
       case 'business':
         return {
@@ -35,7 +39,9 @@ const ContentVisual: React.FC<ContentVisualProps> = ({ contentType, title }) => 
           gradient: 'from-orange-400 via-red-500 to-pink-400',
           bgPattern: 'business-pattern',
           particles: ['📈', '💼', '🎯', '💰', '🚀'],
-          description: 'Business & Entrepreneurship'
+          description: 'Business & Entrepreneurship',
+          bgImage: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?auto=format&fit=crop&w=800&q=80',
+          altText: 'Business coding workspace'
         };
       default:
         return {
@@ -44,7 +50,9 @@ const ContentVisual: React.FC<ContentVisualProps> = ({ contentType, title }) => 
           gradient: 'from-purple-400 via-pink-500 to-blue-400',
           bgPattern: 'general-pattern',
           particles: ['🌟', '💭', '🎨', '📚', '🔮'],
-          description: 'General Knowledge'
+          description: 'General Knowledge',
+          bgImage: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+          altText: 'Peaceful nature background'
         };
     }
   };
@@ -54,21 +62,28 @@ const ContentVisual: React.FC<ContentVisualProps> = ({ contentType, title }) => 
   const SecondaryIcon = visual.secondaryIcon;
 
   return (
-    <div className="relative overflow-hidden rounded-xl p-6 bg-gradient-to-br">
-      {/* Background gradient */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${visual.gradient} opacity-20`} />
-      
-      {/* Animated particles */}
+    <div className="relative overflow-hidden rounded-xl bg-gradient-to-br min-h-[200px] group hover:scale-[1.02] transition-all duration-500">
+      {/* Background Image with Overlay */}
       <div className="absolute inset-0">
+        <img 
+          src={visual.bgImage} 
+          alt={visual.altText}
+          className="w-full h-full object-cover opacity-20 transition-opacity duration-500 group-hover:opacity-30"
+        />
+        <div className={`absolute inset-0 bg-gradient-to-br ${visual.gradient} opacity-40`} />
+      </div>
+      
+      {/* Animated particles with improved positioning */}
+      <div className="absolute inset-0 overflow-hidden">
         {visual.particles.map((particle, index) => (
           <div
             key={index}
-            className="absolute text-2xl animate-bounce opacity-30"
+            className="absolute text-2xl opacity-40 animate-bounce transition-all duration-300 group-hover:opacity-60 group-hover:scale-110"
             style={{
-              left: `${20 + (index * 15)}%`,
-              top: `${10 + (index * 10)}%`,
-              animationDelay: `${index * 0.5}s`,
-              animationDuration: '3s'
+              left: `${15 + (index * 18)}%`,
+              top: `${15 + (index * 12)}%`,
+              animationDelay: `${index * 0.3}s`,
+              animationDuration: `${2 + index * 0.5}s`
             }}
           >
             {particle}
@@ -76,27 +91,41 @@ const ContentVisual: React.FC<ContentVisualProps> = ({ contentType, title }) => 
         ))}
       </div>
 
-      {/* Main content */}
-      <div className="relative z-10 flex items-center space-x-4">
+      {/* Floating geometric shapes */}
+      <div className="absolute inset-0">
+        <div className={`absolute top-4 right-4 w-16 h-16 rounded-full bg-gradient-to-r ${visual.gradient} opacity-20 animate-pulse`} />
+        <div className={`absolute bottom-6 left-6 w-12 h-12 rotate-45 bg-gradient-to-r ${visual.gradient} opacity-15 animate-spin`} style={{ animationDuration: '8s' }} />
+        <div className={`absolute top-1/2 right-1/4 w-8 h-8 rounded-full bg-gradient-to-r ${visual.gradient} opacity-25 animate-bounce`} style={{ animationDelay: '1s' }} />
+      </div>
+
+      {/* Main content with enhanced styling */}
+      <div className="relative z-10 flex items-center space-x-6 p-6 h-full">
         <div className="flex-shrink-0">
-          <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${visual.gradient} flex items-center justify-center shadow-lg`}>
-            <PrimaryIcon className="w-8 h-8 text-white animate-pulse" />
+          <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${visual.gradient} flex items-center justify-center shadow-2xl border border-white/20 backdrop-blur-sm transition-all duration-300 group-hover:scale-110 group-hover:rotate-6`}>
+            <PrimaryIcon className="w-10 h-10 text-white animate-pulse" />
           </div>
         </div>
         
-        <div className="flex-1">
-          <div className="flex items-center space-x-2 mb-2">
-            <SecondaryIcon className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-muted-foreground">{visual.description}</span>
+        <div className="flex-1 space-y-3">
+          <div className="flex items-center space-x-3">
+            <div className={`p-2 rounded-lg bg-gradient-to-r ${visual.gradient} bg-opacity-20 backdrop-blur-sm`}>
+              <SecondaryIcon className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-sm font-semibold text-white/90 tracking-wide uppercase">{visual.description}</span>
           </div>
-          <h3 className="text-lg font-semibold text-foreground line-clamp-2">{title}</h3>
+          <h3 className="text-xl font-bold text-white line-clamp-2 leading-tight drop-shadow-lg">{title}</h3>
+          
+          {/* Progress bar animation */}
+          <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
+            <div className={`h-full bg-gradient-to-r ${visual.gradient} rounded-full animate-pulse`} style={{ width: '75%' }} />
+          </div>
         </div>
       </div>
 
-      {/* Animated border */}
-      <div className={`absolute inset-0 rounded-xl bg-gradient-to-r ${visual.gradient} opacity-30 animate-pulse`} 
-           style={{ padding: '2px' }}>
-        <div className="w-full h-full bg-background rounded-xl" />
+      {/* Animated border glow */}
+      <div className={`absolute inset-0 rounded-xl bg-gradient-to-r ${visual.gradient} opacity-0 group-hover:opacity-30 transition-opacity duration-300`} 
+           style={{ padding: '1px' }}>
+        <div className="w-full h-full bg-transparent rounded-xl" />
       </div>
     </div>
   );

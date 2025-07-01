@@ -1,246 +1,264 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LinkIcon, FileText, Loader2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { parseUrlContent, cleanContent } from '../utils/contentParser';
-import ContentCleaner from './ContentCleaner';
-import VoiceSelector from './VoiceSelector';
-import MusicSelector from './MusicSelector';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useToast } from "@/hooks/use-toast"
+import { parseUrlContent, cleanContent, ParsedContent } from '../utils/contentParser';
+import ContentVisual from './ContentVisual';
 
 interface BlogInputProps {
   onSubmit: (content: any, options: any) => void;
 }
 
 const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
-  const [blogUrl, setBlogUrl] = useState('');
-  const [blogText, setBlogText] = useState('');
+  const [url, setUrl] = useState('');
+  const [rawContent, setRawContent] = useState('');
+  const [parsedContent, setParsedContent] = useState<ParsedContent | null>(null);
+  const [voice, setVoice] = useState('aria');
+  const [tone, setTone] = useState('professional');
+  const [includeIntro, setIncludeIntro] = useState(true);
+  const [includeOutro, setIncludeOutro] = useState(true);
+  const [maxDuration, setMaxDuration] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
-  const [parsedContent, setParsedContent] = useState<any>(null);
-  const [selectedVoice, setSelectedVoice] = useState('aria');
-  const [selectedMusic, setSelectedMusic] = useState('ambient-tech');
   const { toast } = useToast();
 
-  const handleUrlSubmit = async () => {
-    if (!blogUrl.trim()) {
-      toast({
-        title: "URL Required",
-        description: "Please enter a valid blog URL",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const handleUrlSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
     setIsLoading(true);
-    
     try {
-      // Parse content from URL
-      const content = await parseUrlContent(blogUrl);
-      const cleanedContent = cleanContent(content.content);
-      
-      setParsedContent({
-        ...content,
-        content: cleanedContent,
-        source: blogUrl
-      });
-      
-      // Set the suggested voice based on content type
-      setSelectedVoice(content.suggestedVoice);
-      
-      // Set music based on content type
-      const musicMap = {
-        tech: 'ambient-tech',
-        health: 'nature-calm',
-        business: 'corporate-upbeat',
-        general: 'cinematic-inspiring'
-      };
-      setSelectedMusic(musicMap[content.contentType] || 'ambient-tech');
-      
-      setIsLoading(false);
+      const content = await parseUrlContent(url);
+      setParsedContent(content);
     } catch (error) {
+      console.error('Error parsing URL:', error);
+      toast({
+        title: "Parsing Failed",
+        description: "Failed to parse content from the URL. Please check the URL and try again.",
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-      toast({
-        title: "Error",
-        description: "Failed to extract content from URL",
-        variant: "destructive",
-      });
     }
-  };
+  }, [url, toast]);
 
-  const handleTextSubmit = () => {
-    if (!blogText.trim()) {
+  const handleContentSubmit = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    try {
+      const cleanedContent = cleanContent(rawContent);
+      // Simulate content parsing
+      const simulatedParsedContent = {
+        title: 'Custom Content',
+        content: cleanedContent,
+        contentType: 'general',
+        suggestedVoice: 'aria',
+        metadata: {
+          wordCount: cleanedContent.split(' ').length,
+          readingTime: `${Math.ceil(cleanedContent.split(' ').length / 200)} min read`,
+          author: 'Custom Input',
+          publishDate: new Date().toLocaleDateString()
+        }
+      };
+      setParsedContent(simulatedParsedContent as ParsedContent);
+    } catch (error) {
+      console.error('Error cleaning content:', error);
       toast({
-        title: "Content Required",
-        description: "Please enter some blog content",
-        variant: "destructive",
+        title: "Content Processing Failed",
+        description: "Failed to process the content. Please check the content and try again.",
+        variant: "destructive"
       });
-      return;
+    } finally {
+      setIsLoading(false);
     }
-
-    const lines = blogText.split('\n').filter(line => line.trim());
-    const title = lines[0]?.replace(/^#+\s*/, '') || 'Generated Podcast';
-    const wordCount = blogText.split(' ').length;
-    
-    // Detect content type from text
-    const text = blogText.toLowerCase();
-    let contentType: 'tech' | 'health' | 'business' | 'general' = 'general';
-    let suggestedVoice = 'aria';
-    
-    if (text.includes('ai') || text.includes('technology') || text.includes('programming')) {
-      contentType = 'tech';
-      suggestedVoice = 'charlie';
-    } else if (text.includes('health') || text.includes('medical') || text.includes('wellness')) {
-      contentType = 'health';
-      suggestedVoice = 'laura';
-    } else if (text.includes('business') || text.includes('startup') || text.includes('entrepreneur')) {
-      contentType = 'business';
-      suggestedVoice = 'george';
-    }
-    
-    setParsedContent({
-      title,
-      content: blogText,
-      contentType,
-      suggestedVoice,
-      metadata: {
-        wordCount,
-        readingTime: `${Math.ceil(wordCount / 200)} min read`,
-      },
-      source: 'Direct input'
-    });
-    
-    setSelectedVoice(suggestedVoice);
-  };
+  }, [rawContent, toast]);
 
   const handleGeneratePodcast = () => {
-    const options = {
-      voice: selectedVoice,
-      music: selectedMusic,
-      tone: 'professional',
-      includeIntro: true,
-      includeOutro: true,
-      maxDuration: 10
-    };
-    
-    onSubmit(parsedContent, options);
+    if (!parsedContent) {
+      toast({
+        title: "Content Required",
+        description: "Please enter a URL or content to generate a podcast.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    onSubmit(parsedContent, {
+      voice,
+      tone,
+      includeIntro,
+      includeOutro,
+      maxDuration,
+    });
   };
 
-  if (parsedContent) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h3 className="text-2xl font-semibold mb-2">Configure Your Podcast</h3>
-          <p className="text-muted-foreground">
-            Customize voice and music settings for your episode
-          </p>
-        </div>
-
-        <ContentCleaner
-          originalContent={parsedContent.content}
-          cleanedContent={parsedContent.content}
-          metadata={parsedContent.metadata}
-        />
-
-        <VoiceSelector
-          selectedVoice={selectedVoice}
-          onVoiceChange={setSelectedVoice}
-        />
-
-        <MusicSelector
-          selectedTrack={selectedMusic}
-          onTrackChange={setSelectedMusic}
-        />
-
-        <div className="flex gap-3 justify-center">
-          <Button
-            onClick={() => setParsedContent(null)}
-            variant="outline"
-          >
-            Back to Input
-          </Button>
-          <Button
-            onClick={handleGeneratePodcast}
-            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            Generate Podcast
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-2xl font-semibold mb-2">Import Your Blog Content</h3>
+    <div className="space-y-8">
+      <div className="text-center space-y-4">
+        <h3 className="text-2xl font-bold">Transform Your Blog into a Podcast</h3>
         <p className="text-muted-foreground">
-          Start by providing your blog content through URL or direct input
+          Enter a blog URL or paste content directly. Our AI will analyze the content and create a personalized podcast experience.
         </p>
       </div>
 
-      <Tabs defaultValue="url" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 bg-muted/20">
-          <TabsTrigger value="url" className="flex items-center gap-2">
-            <LinkIcon className="w-4 h-4" />
-            From URL
-          </TabsTrigger>
-          <TabsTrigger value="text" className="flex items-center gap-2">
-            <FileText className="w-4 h-4" />
-            Paste Text
-          </TabsTrigger>
-        </TabsList>
+      {/* Content Preview with Enhanced Visual */}
+      {parsedContent && (
+        <div className="space-y-6 animate-fade-in">
+          <ContentVisual 
+            contentType={parsedContent.contentType} 
+            title={parsedContent.title} 
+          />
+          
+          <Card className="p-6 glass border-white/10">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-lg">Content Analysis</h4>
+                <Badge variant="outline" className="text-xs">
+                  {parsedContent.metadata.readingTime}
+                </Badge>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="text-center p-3 rounded-lg bg-white/5">
+                  <div className="font-semibold text-purple-400">{parsedContent.metadata.wordCount}</div>
+                  <div className="text-xs text-muted-foreground">Words</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-white/5">
+                  <div className="font-semibold text-blue-400">{parsedContent.contentType}</div>
+                  <div className="text-xs text-muted-foreground">Category</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-white/5">
+                  <div className="font-semibold text-green-400">{parsedContent.suggestedVoice}</div>
+                  <div className="text-xs text-muted-foreground">Suggested Voice</div>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-white/5">
+                  <div className="font-semibold text-orange-400">~5 min</div>
+                  <div className="text-xs text-muted-foreground">Est. Duration</div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
 
-        <TabsContent value="url" className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="blog-url">Blog Post URL</Label>
+      {/* URL Input Section */}
+      <Card className="p-6 glass border-white/10">
+        <div className="space-y-4">
+          <h4 className="text-lg font-semibold">Generate from URL</h4>
+          <p className="text-sm text-muted-foreground">
+            Enter the URL of a blog post to automatically extract and analyze its content.
+          </p>
+          <form onSubmit={handleUrlSubmit} className="flex space-x-2">
             <Input
-              id="blog-url"
               type="url"
-              placeholder="https://example.com/blog-post (try URLs with 'tech', 'health', or 'business')"
-              value={blogUrl}
-              onChange={(e) => setBlogUrl(e.target.value)}
-              className="bg-background/50"
+              placeholder="Enter blog URL..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={isLoading}
             />
-          </div>
-          <Button 
-            onClick={handleUrlSubmit} 
-            disabled={isLoading}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Extracting Content...
-              </>
-            ) : (
-              'Extract Content'
-            )}
-          </Button>
-        </TabsContent>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Loading...' : 'Parse URL'}
+            </Button>
+          </form>
+        </div>
+      </Card>
 
-        <TabsContent value="text" className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="blog-text">Blog Content</Label>
-            <Textarea
-              id="blog-text"
-              placeholder="Paste your blog post content here..."
-              value={blogText}
-              onChange={(e) => setBlogText(e.target.value)}
-              rows={10}
-              className="bg-background/50 resize-none"
+      {/* Direct Content Input */}
+      <Card className="p-6 glass border-white/10">
+        <div className="space-y-4">
+          <h4 className="text-lg font-semibold">Paste Content Directly</h4>
+          <p className="text-sm text-muted-foreground">
+            Alternatively, paste the content of your blog post directly into the text area below.
+          </p>
+          <form onSubmit={handleContentSubmit} className="space-y-2">
+            <Input.TextArea
+              placeholder="Paste blog content here..."
+              value={rawContent}
+              onChange={(e) => setRawContent(e.target.value)}
+              rows={4}
+              disabled={isLoading}
             />
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Loading...' : 'Process Content'}
+            </Button>
+          </form>
+        </div>
+      </Card>
+
+      {/* Customization Options */}
+      {parsedContent && (
+        <Card className="p-6 glass border-white/10 animate-fade-in">
+          <div className="space-y-4">
+            <h4 className="text-lg font-semibold">Podcast Options</h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="voice">Voice</Label>
+                <Select value={voice} onValueChange={setVoice}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a voice" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="aria">Aria</SelectItem>
+                    <SelectItem value="sarah">Sarah</SelectItem>
+                    <SelectItem value="charlie">Charlie</SelectItem>
+                    <SelectItem value="laura">Laura</SelectItem>
+                    <SelectItem value="george">George</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label>Tone</Label>
+                <RadioGroup defaultValue={tone} className="flex space-x-2" onValueChange={setTone}>
+                  <RadioGroupItem value="professional" id="tone-professional" className="peer h-5 w-5 rounded-full border-2 border-muted ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" />
+                  <Label htmlFor="tone-professional" className="cursor-pointer">Professional</Label>
+                  <RadioGroupItem value="casual" id="tone-casual" className="peer h-5 w-5 rounded-full border-2 border-muted ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" />
+                  <Label htmlFor="tone-casual" className="cursor-pointer">Casual</Label>
+                </RadioGroup>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="includeIntro">Include Intro</Label>
+                <Input
+                  type="checkbox"
+                  id="includeIntro"
+                  checked={includeIntro}
+                  onChange={(e) => setIncludeIntro(e.target.checked)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="includeOutro">Include Outro</Label>
+                <Input
+                  type="checkbox"
+                  id="includeOutro"
+                  checked={includeOutro}
+                  onChange={(e) => setIncludeOutro(e.target.checked)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="maxDuration">Max Duration (minutes)</Label>
+              <Input
+                type="number"
+                id="maxDuration"
+                value={maxDuration}
+                onChange={(e) => setMaxDuration(parseInt(e.target.value))}
+              />
+            </div>
+
+            <Button onClick={handleGeneratePodcast} className="w-full">
+              Generate Podcast
+            </Button>
           </div>
-          <Button 
-            onClick={handleTextSubmit}
-            className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
-          >
-            Process Content
-          </Button>
-        </TabsContent>
-      </Tabs>
+        </Card>
+      )}
     </div>
   );
 };
