@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -173,7 +174,7 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
             Alternatively, paste the content of your blog post directly into the text area below.
           </p>
           <form onSubmit={handleContentSubmit} className="space-y-2">
-            <Input.TextArea
+            <Textarea
               placeholder="Paste blog content here..."
               value={rawContent}
               onChange={(e) => setRawContent(e.target.value)}
