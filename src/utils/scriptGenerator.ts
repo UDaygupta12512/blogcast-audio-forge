@@ -41,6 +41,11 @@ export const generatePodcastScript = (
         george: `Welcome entrepreneurs and business leaders. I'm George, and today's strategic discussion covers "${title}".`,
         sarah: `This is Sarah with your business update. Today's focus: "${title}".`,
         aria: `Hello business innovators! Today we're exploring the entrepreneurial insights in "${title}".`
+      },
+      general: {
+        aria: `Hello and welcome! I'm excited to share some fascinating insights with you today in our episode: "${title}".`,
+        sarah: `Good day, I'm Sarah, and this is your briefing. Today we're covering "${title}".`,
+        charlie: `Hey everyone! Charlie here with another exciting episode. Today we're diving into "${title}".`
       }
     };
 
@@ -70,6 +75,11 @@ export const generatePodcastScript = (
       business: {
         george: `This concludes our business analysis. Apply these insights strategically. Thank you for your attention.`,
         sarah: `That wraps up today's business briefing. Keep innovating, and we'll see you next time.`
+      },
+      general: {
+        aria: `That brings us to the end of today's discussion. Thank you for listening, and I hope you found these insights valuable. Until next time!`,
+        charlie: `And that's a wrap! Thanks for tuning in everyone. Don't forget to subscribe for more great content!`,
+        george: `This concludes our examination of the topic. Thank you for your attention.`
       }
     };
 
