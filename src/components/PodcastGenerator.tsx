@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import BlogInput from './BlogInput';
 import ProcessingSteps from './ProcessingSteps';
@@ -8,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { generatePodcastScript, estimateScriptDuration } from '../utils/scriptGenerator';
-import { TTSService, VOICE_IDS } from '../services/ttsService';
+import { TTSService, VOICE_IDS, type SubtitleSegment } from '../services/ttsService';
 import { useToast } from '@/hooks/use-toast';
 
 export interface PodcastData {
@@ -18,6 +19,7 @@ export interface PodcastData {
   duration?: string;
   voice: string;
   music: string;
+  subtitles?: SubtitleSegment[];
 }
 
 const PodcastGenerator = () => {
@@ -25,9 +27,10 @@ const PodcastGenerator = () => {
   const [podcastData, setPodcastData] = useState<PodcastData | null>(null);
   const [apiKey, setApiKey] = useState<string>('');
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
   const { toast } = useToast();
 
-  const handleApiKeySubmit = () => {
+  const handleApiKeySubmit = async () => {
     if (!apiKey.trim()) {
       toast({
         title: "API Key Required",
@@ -36,7 +39,35 @@ const PodcastGenerator = () => {
       });
       return;
     }
-    setStep('input');
+
+    setIsValidatingKey(true);
+    try {
+      const ttsService = new TTSService(apiKey);
+      const isValid = await ttsService.validateApiKey();
+      
+      if (!isValid) {
+        toast({
+          title: "Invalid API Key",
+          description: "The provided API key is not valid. Please check and try again.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      toast({
+        title: "API Key Validated",
+        description: "Your API key is valid. You can now proceed to create podcasts.",
+      });
+      setStep('input');
+    } catch (error) {
+      toast({
+        title: "Validation Failed",
+        description: "Failed to validate API key. Please check your internet connection and try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsValidatingKey(false);
+    }
   };
 
   const handleBlogSubmit = async (content: any, options: any) => {
@@ -61,23 +92,23 @@ const PodcastGenerator = () => {
       const ttsService = new TTSService(apiKey);
       const voiceId = VOICE_IDS[options.voice as keyof typeof VOICE_IDS] || VOICE_IDS.aria;
       
-      const audioUrl = await ttsService.generateAudio({
+      const { audioUrl, subtitles } = await ttsService.generateAudio({
         text: script,
         voiceId,
       });
 
-      setPodcastData(prev => prev ? { ...prev, audioUrl } : null);
+      setPodcastData(prev => prev ? { ...prev, audioUrl, subtitles } : null);
       setStep('complete');
       
       toast({
         title: "Podcast Generated!",
-        description: "Your podcast episode is ready to listen.",
+        description: "Your podcast episode is ready to listen with subtitles.",
       });
     } catch (error) {
       console.error('Error generating podcast:', error);
       toast({
         title: "Generation Failed",
-        description: "Failed to generate audio. Please check your API key and try again.",
+        description: error instanceof Error ? error.message : "Failed to generate audio. Please try again.",
         variant: "destructive"
       });
       setStep('input');
@@ -136,8 +167,12 @@ const PodcastGenerator = () => {
               </p>
             </div>
             
-            <Button onClick={handleApiKeySubmit} className="w-full">
-              Continue
+            <Button 
+              onClick={handleApiKeySubmit} 
+              className="w-full"
+              disabled={isValidatingKey}
+            >
+              {isValidatingKey ? 'Validating...' : 'Continue'}
             </Button>
           </div>
         </Card>
@@ -164,8 +199,8 @@ const PodcastGenerator = () => {
             customSteps={[
               'Parsing blog content',
               'Generating podcast script',
-              'Converting text to speech',
-              isGeneratingAudio ? 'Generating audio...' : 'Processing audio'
+              'Validating content length',
+              isGeneratingAudio ? 'Converting text to speech...' : 'Processing audio'
             ]}
           />
         )}

@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Play, Pause, Download, Share2, RotateCcw, Volume2 } from 'lucide-react';
+import { Play, Pause, Download, Share2, RotateCcw, Volume2, Subtitles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PodcastData } from './PodcastGenerator';
 
@@ -15,6 +15,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
 
@@ -22,7 +24,18 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    const updateTime = () => {
+      setCurrentTime(audio.currentTime);
+      
+      // Update current subtitle
+      if (podcastData.subtitles && showSubtitles) {
+        const current = podcastData.subtitles.find(
+          subtitle => audio.currentTime >= subtitle.start && audio.currentTime <= subtitle.end
+        );
+        setCurrentSubtitle(current?.text || '');
+      }
+    };
+    
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
 
@@ -35,7 +48,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [podcastData.audioUrl]);
+  }, [podcastData.audioUrl, podcastData.subtitles, showSubtitles]);
 
   const togglePlayback = () => {
     const audio = audioRef.current;
@@ -93,7 +106,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
       <div className="text-center">
         <h3 className="text-2xl font-semibold mb-2">Your Podcast is Ready!</h3>
         <p className="text-muted-foreground">
-          Listen to your AI-generated podcast episode
+          Listen to your AI-generated podcast episode with subtitles
         </p>
       </div>
 
@@ -147,9 +160,26 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
               {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
             </Button>
             <Volume2 className="w-5 h-5 text-muted-foreground" />
+            <Button
+              onClick={() => setShowSubtitles(!showSubtitles)}
+              variant="outline"
+              size="sm"
+              className={showSubtitles ? 'bg-purple-600/20' : ''}
+            >
+              <Subtitles className="w-4 h-4" />
+            </Button>
           </div>
         </div>
       </Card>
+
+      {/* Subtitles Display */}
+      {showSubtitles && currentSubtitle && (
+        <Card className="p-4 bg-black/80 backdrop-blur-sm">
+          <p className="text-center text-white text-lg leading-relaxed">
+            {currentSubtitle}
+          </p>
+        </Card>
+      )}
 
       <Card className="p-4 bg-muted/20">
         <h5 className="font-medium mb-2">Generated Script Preview</h5>
