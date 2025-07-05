@@ -2,8 +2,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Play, Pause, Download, Share2, RotateCcw, Volume2, Subtitles } from 'lucide-react';
+import { Play, Pause, Download, Share2, RotateCcw, Subtitles, SkipBack, SkipForward } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import AudioControls from './AudioControls';
 import type { PodcastData } from './PodcastGenerator';
 
 interface AudioPlayerProps {
@@ -17,6 +18,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [duration, setDuration] = useState(0);
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
+  const [volume, setVolume] = useState(75);
+  const [isMuted, setIsMuted] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [audioQuality, setAudioQuality] = useState<'standard' | 'high'>('high');
+  const [showControls, setShowControls] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const { toast } = useToast();
 
@@ -27,7 +33,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     const updateTime = () => {
       setCurrentTime(audio.currentTime);
       
-      // Update current subtitle
       if (podcastData.subtitles && showSubtitles) {
         const current = podcastData.subtitles.find(
           subtitle => audio.currentTime >= subtitle.start && audio.currentTime <= subtitle.end
@@ -43,12 +48,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
 
+    // Apply audio settings
+    audio.volume = isMuted ? 0 : volume / 100;
+    audio.playbackRate = playbackRate;
+
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [podcastData.audioUrl, podcastData.subtitles, showSubtitles]);
+  }, [podcastData.audioUrl, podcastData.subtitles, showSubtitles, volume, isMuted, playbackRate]);
 
   const togglePlayback = () => {
     const audio = audioRef.current;
@@ -60,6 +69,24 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
       audio.play();
     }
     setIsPlaying(!isPlaying);
+  };
+
+  const skipTime = (seconds: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    audio.currentTime = Math.max(0, Math.min(duration, audio.currentTime + seconds));
+  };
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const audio = audioRef.current;
+    if (!audio || !duration) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const newTime = (clickX / rect.width) * duration;
+    
+    audio.currentTime = newTime;
   };
 
   const formatTime = (seconds: number) => {
@@ -104,9 +131,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-2xl font-semibold mb-2">Your Podcast is Ready!</h3>
+        <h3 className="text-2xl font-semibold mb-2">Your Enhanced Podcast is Ready!</h3>
         <p className="text-muted-foreground">
-          Listen to your AI-generated podcast episode with subtitles
+          Listen with advanced controls, subtitles, and high-quality audio
         </p>
       </div>
 
@@ -116,7 +143,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         <div className="space-y-4">
           <div className="text-center">
             <h4 className="text-lg font-semibold text-purple-200">{podcastData.title}</h4>
-            <p className="text-sm text-muted-foreground">Duration: {formatTime(duration)}</p>
+            <p className="text-sm text-muted-foreground">Duration: {formatTime(duration)} • Quality: {audioQuality}</p>
           </div>
 
           <div className="flex items-center justify-center">
@@ -141,17 +168,32 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>{formatTime(currentTime)}</span>
+              <span>{playbackRate}x speed</span>
               <span>{formatTime(duration)}</span>
             </div>
-            <div className="w-full bg-muted rounded-full h-2">
+            <div 
+              className="w-full bg-muted rounded-full h-3 cursor-pointer hover:h-4 transition-all"
+              onClick={handleProgressClick}
+            >
               <div 
-                className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-300"
+                className="bg-gradient-to-r from-purple-500 to-blue-500 h-full rounded-full transition-all duration-300 relative"
                 style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
-              />
+              >
+                <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 hover:opacity-100 transition-opacity" />
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-center space-x-4">
+          <div className="flex items-center justify-center space-x-3">
+            <Button
+              onClick={() => skipTime(-10)}
+              size="sm"
+              variant="outline"
+              className="rounded-full"
+            >
+              <SkipBack className="w-4 h-4" />
+            </Button>
+            
             <Button
               onClick={togglePlayback}
               size="lg"
@@ -159,7 +201,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
             >
               {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
             </Button>
-            <Volume2 className="w-5 h-5 text-muted-foreground" />
+            
+            <Button
+              onClick={() => skipTime(10)}
+              size="sm"
+              variant="outline"
+              className="rounded-full"
+            >
+              <SkipForward className="w-4 h-4" />
+            </Button>
+
             <Button
               onClick={() => setShowSubtitles(!showSubtitles)}
               variant="outline"
@@ -172,15 +223,41 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         </div>
       </Card>
 
-      {/* Subtitles Display */}
+      {/* Enhanced Audio Controls */}
+      <div className="flex gap-2">
+        <Button
+          onClick={() => setShowControls(!showControls)}
+          variant="outline"
+          size="sm"
+          className="mb-4"
+        >
+          {showControls ? 'Hide' : 'Show'} Controls
+        </Button>
+      </div>
+
+      {showControls && (
+        <AudioControls
+          volume={volume}
+          onVolumeChange={setVolume}
+          playbackRate={playbackRate}
+          onPlaybackRateChange={setPlaybackRate}
+          isMuted={isMuted}
+          onMuteToggle={() => setIsMuted(!isMuted)}
+          audioQuality={audioQuality}
+          onQualityChange={setAudioQuality}
+        />
+      )}
+
+      {/* Enhanced Subtitles Display */}
       {showSubtitles && currentSubtitle && (
-        <Card className="p-4 bg-black/80 backdrop-blur-sm">
-          <p className="text-center text-white text-lg leading-relaxed">
+        <Card className="p-6 bg-black/90 backdrop-blur-sm border-purple-500/30">
+          <p className="text-center text-white text-xl leading-relaxed font-medium">
             {currentSubtitle}
           </p>
         </Card>
       )}
 
+      {/* Script Preview */}
       <Card className="p-4 bg-muted/20">
         <h5 className="font-medium mb-2">Generated Script Preview</h5>
         <p className="text-sm text-muted-foreground line-clamp-3">

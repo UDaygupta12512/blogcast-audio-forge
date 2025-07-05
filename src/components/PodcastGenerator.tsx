@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { generatePodcastScript, estimateScriptDuration } from '../utils/scriptGenerator';
 import { TTSService, VOICE_IDS, type SubtitleSegment } from '../services/ttsService';
 import { useToast } from '@/hooks/use-toast';
@@ -28,6 +29,8 @@ const PodcastGenerator = () => {
   const [apiKey, setApiKey] = useState<string>('');
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [audioQuality, setAudioQuality] = useState<'standard' | 'high'>('high');
+  const [speed, setSpeed] = useState<number>(1);
   const { toast } = useToast();
 
   const handleApiKeySubmit = async () => {
@@ -42,27 +45,29 @@ const PodcastGenerator = () => {
 
     setIsValidatingKey(true);
     try {
+      console.log('Validating API key...');
       const ttsService = new TTSService(apiKey);
       const isValid = await ttsService.validateApiKey();
       
       if (!isValid) {
         toast({
           title: "Invalid API Key",
-          description: "The provided API key is not valid. Please check and try again.",
+          description: "Please check your ElevenLabs API key and try again. Make sure it has the required permissions.",
           variant: "destructive"
         });
         return;
       }
       
       toast({
-        title: "API Key Validated",
-        description: "Your API key is valid. You can now proceed to create podcasts.",
+        title: "API Key Validated ✅",
+        description: "Your API key is working! You can now create podcasts with enhanced features.",
       });
       setStep('input');
     } catch (error) {
+      console.error('API key validation error:', error);
       toast({
         title: "Validation Failed",
-        description: "Failed to validate API key. Please check your internet connection and try again.",
+        description: "Failed to validate API key. Please check your internet connection and API key.",
         variant: "destructive"
       });
     } finally {
@@ -74,11 +79,16 @@ const PodcastGenerator = () => {
     setStep('processing');
     
     try {
-      // Generate enhanced script with user options
-      const script = generatePodcastScript(content, options);
+      console.log('Starting enhanced podcast generation...');
+      
+      // Generate enhanced script
+      const script = generatePodcastScript(content, {
+        ...options,
+        quality: audioQuality,
+        speed: speed
+      });
       const duration = estimateScriptDuration(script);
       
-      // Update to show script generation complete
       setPodcastData({
         title: content.title,
         script,
@@ -87,28 +97,38 @@ const PodcastGenerator = () => {
         music: options.music
       });
 
-      // Generate actual audio using ElevenLabs
+      // Generate audio with enhanced settings
       setIsGeneratingAudio(true);
       const ttsService = new TTSService(apiKey);
       const voiceId = VOICE_IDS[options.voice as keyof typeof VOICE_IDS] || VOICE_IDS.aria;
       
+      console.log('Generating audio with voice:', options.voice, 'ID:', voiceId);
+      
       const { audioUrl, subtitles } = await ttsService.generateAudio({
         text: script,
         voiceId,
+        model: audioQuality === 'high' ? 'eleven_multilingual_v2' : 'eleven_turbo_v2_5',
+        speed: speed,
+        stability: 0.6,
+        similarity: 0.8,
       });
 
       setPodcastData(prev => prev ? { ...prev, audioUrl, subtitles } : null);
       setStep('complete');
       
       toast({
-        title: "Podcast Generated!",
-        description: "Your podcast episode is ready to listen with subtitles.",
+        title: "🎉 Podcast Generated Successfully!",
+        description: "Your enhanced podcast with subtitles and controls is ready!",
       });
     } catch (error) {
       console.error('Error generating podcast:', error);
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Failed to generate audio. Please check your API key and try again.";
+      
       toast({
         title: "Generation Failed",
-        description: error instanceof Error ? error.message : "Failed to generate audio. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
       setStep('input');
@@ -137,34 +157,62 @@ const PodcastGenerator = () => {
         </div>
 
         <Card className="p-8 glass border-0 shadow-2xl max-w-md mx-auto">
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="text-center">
-              <h3 className="text-xl font-semibold mb-2">Setup Required</h3>
+              <h3 className="text-xl font-semibold mb-2">Enhanced Setup</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Enter your ElevenLabs API key to enable real text-to-speech generation.
+                Configure your ElevenLabs API key and audio preferences for high-quality podcast generation.
               </p>
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="apiKey">ElevenLabs API Key</Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder="Enter your API key..."
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Get your API key from{' '}
-                <a 
-                  href="https://elevenlabs.io/api" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-purple-400 hover:underline"
-                >
-                  ElevenLabs
-                </a>
-              </p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="apiKey">ElevenLabs API Key</Label>
+                <Input
+                  id="apiKey"
+                  type="password"
+                  placeholder="Enter your API key..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Get your API key from{' '}
+                  <a 
+                    href="https://elevenlabs.io/api" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:underline"
+                  >
+                    ElevenLabs
+                  </a>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="quality">Audio Quality</Label>
+                <Select value={audioQuality} onValueChange={(value: 'standard' | 'high') => setAudioQuality(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard (Faster)</SelectItem>
+                    <SelectItem value="high">High Quality (Recommended)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="speed">Speech Speed: {speed}x</Label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="1.5"
+                  step="0.1"
+                  value={speed}
+                  onChange={(e) => setSpeed(parseFloat(e.target.value))}
+                  className="w-full"
+                />
+              </div>
             </div>
             
             <Button 
@@ -172,7 +220,7 @@ const PodcastGenerator = () => {
               className="w-full"
               disabled={isValidatingKey}
             >
-              {isValidatingKey ? 'Validating...' : 'Continue'}
+              {isValidatingKey ? 'Validating API Key...' : 'Continue with Enhanced Setup'}
             </Button>
           </div>
         </Card>
@@ -197,10 +245,10 @@ const PodcastGenerator = () => {
         {step === 'processing' && (
           <ProcessingSteps 
             customSteps={[
-              'Parsing blog content',
-              'Generating podcast script',
-              'Validating content length',
-              isGeneratingAudio ? 'Converting text to speech...' : 'Processing audio'
+              'Parsing and analyzing content',
+              'Generating enhanced podcast script',
+              'Optimizing for selected voice',
+              isGeneratingAudio ? 'Converting to high-quality speech...' : 'Preparing audio generation'
             ]}
           />
         )}
