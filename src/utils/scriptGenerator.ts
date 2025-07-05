@@ -15,81 +15,55 @@ export const generatePodcastScript = (
 ): string => {
   const { title, content: articleContent, metadata, contentType } = content;
   
-  // Create different intros based on content type and voice selection
+  // Create personalized intros based on actual content
   const getIntro = (): string => {
-    const baseIntros = {
-      aria: `Hello and welcome! I'm excited to share some fascinating insights with you today in our episode: "${title}".`,
-      sarah: `Good day, I'm Sarah, and this is your briefing. Today we're covering "${title}".`,
-      charlie: `Hey everyone! Charlie here with another exciting episode. Today we're diving into "${title}".`,
-      laura: `Welcome to this peaceful exploration of "${title}". I'm Laura, and I'm here to guide you through these insights.`,
-      george: `Greetings. I'm George, and today we'll be examining "${title}" in detail.`
+    const personalizedIntros = {
+      aria: `Hello everyone! I'm Aria, and welcome to today's episode. We're exploring "${title}" - a ${metadata.readingTime} piece that caught my attention. Let's dive in!`,
+      sarah: `Good day, I'm Sarah. Today's briefing covers "${title}". This ${contentType} content offers some fascinating insights worth discussing.`,
+      charlie: `Hey tech enthusiasts! Charlie here, and I'm excited to break down "${title}" for you. This is going to be an engaging discussion!`,
+      laura: `Welcome, I'm Laura. Today we'll take a mindful journey through "${title}". Let's explore these insights together in a calm, thoughtful way.`,
+      george: `Greetings. George here with today's analysis of "${title}". We'll examine this ${contentType} content methodically and thoroughly.`
     };
 
-    // Customize intro based on content type
-    const typeCustomizations = {
-      tech: {
-        aria: `Hello tech enthusiasts! Welcome to another exciting episode where we explore the cutting-edge world of technology. Today's topic: "${title}".`,
-        charlie: `What's up tech lovers! Charlie here, and boy do I have some mind-blowing tech insights for you today! We're diving deep into "${title}".`,
-        george: `Welcome to our technology briefing. I'm George, and today we'll dissect the fascinating developments in "${title}".`
-      },
-      health: {
-        laura: `Welcome to your wellness journey. I'm Laura, and today we'll explore the important topic of "${title}" together.`,
-        aria: `Hello and welcome to our health and wellness discussion. Today's episode focuses on "${title}".`,
-        sarah: `Good day, this is Sarah with your health briefing. Today we're discussing "${title}".`
-      },
-      business: {
-        george: `Welcome entrepreneurs and business leaders. I'm George, and today's strategic discussion covers "${title}".`,
-        sarah: `This is Sarah with your business update. Today's focus: "${title}".`,
-        aria: `Hello business innovators! Today we're exploring the entrepreneurial insights in "${title}".`
-      },
-      general: {
-        aria: `Hello and welcome! I'm excited to share some fascinating insights with you today in our episode: "${title}".`,
-        sarah: `Good day, I'm Sarah, and this is your briefing. Today we're covering "${title}".`,
-        charlie: `Hey everyone! Charlie here with another exciting episode. Today we're diving into "${title}".`
-      }
-    };
-
-    const customIntro = typeCustomizations[contentType]?.[options.voice as keyof typeof typeCustomizations[typeof contentType]];
-    return customIntro || baseIntros[options.voice as keyof typeof baseIntros] || baseIntros.aria;
+    return personalizedIntros[options.voice as keyof typeof personalizedIntros] || personalizedIntros.aria;
   };
 
   const getOutro = (): string => {
-    const baseOutros = {
-      aria: `That brings us to the end of today's discussion. Thank you for listening, and I hope you found these insights valuable. Until next time!`,
-      sarah: `That concludes today's briefing. Stay informed, and we'll see you next time.`,
-      charlie: `And that's a wrap! Thanks for tuning in everyone. Don't forget to subscribe for more great content!`,
-      laura: `Thank you for taking this journey with me today. May these insights serve you well. Take care.`,
-      george: `This concludes our examination of the topic. Thank you for your attention.`
+    const personalizedOutros = {
+      aria: `That wraps up our exploration of "${title}". I hope you found these insights as fascinating as I did. Thanks for listening, and see you next time!`,
+      sarah: `That concludes today's briefing on "${title}". Stay informed and keep learning. This is Sarah, signing off.`,
+      charlie: `And that's a wrap on "${title}"! Hope you enjoyed this deep dive as much as I did. Keep innovating, and catch you in the next episode!`,
+      laura: `Thank you for joining me in exploring "${title}". May these insights serve you well on your journey. Take care until we meet again.`,
+      george: `This concludes our examination of "${title}". Apply these insights strategically. Thank you for your attention.`
     };
 
-    // Customize outro based on content type
-    const typeCustomizations = {
-      tech: {
-        charlie: `That's all for today's tech deep dive! Keep innovating, and I'll catch you in the next episode!`,
-        george: `This concludes our technical analysis. Continue exploring these technological frontiers. Until next time.`
-      },
-      health: {
-        laura: `Thank you for prioritizing your wellness journey with me today. Take care of yourself, and see you next time.`,
-        sarah: `That concludes today's health briefing. Stay healthy, stay informed.`
-      },
-      business: {
-        george: `This concludes our business analysis. Apply these insights strategically. Thank you for your attention.`,
-        sarah: `That wraps up today's business briefing. Keep innovating, and we'll see you next time.`
-      },
-      general: {
-        aria: `That brings us to the end of today's discussion. Thank you for listening, and I hope you found these insights valuable. Until next time!`,
-        charlie: `And that's a wrap! Thanks for tuning in everyone. Don't forget to subscribe for more great content!`,
-        george: `This concludes our examination of the topic. Thank you for your attention.`
-      }
-    };
-
-    const customOutro = typeCustomizations[contentType]?.[options.voice as keyof typeof typeCustomizations[typeof contentType]];
-    return customOutro || baseOutros[options.voice as keyof typeof baseOutros] || baseOutros.aria;
+    return personalizedOutros[options.voice as keyof typeof personalizedOutros] || personalizedOutros.aria;
   };
 
-  // Extract key sections from content
-  const sections = articleContent.split('\n\n').filter(section => section.trim().length > 50);
-  const maxSections = Math.min(sections.length, 4); // Limit to prevent overly long scripts
+  // Extract meaningful sections from the actual content
+  const extractKeyPoints = (content: string): string[] => {
+    const paragraphs = content.split('\n\n').filter(p => p.trim().length > 100);
+    const keyPoints: string[] = [];
+    
+    // Take the most substantial paragraphs
+    const sortedParagraphs = paragraphs
+      .sort((a, b) => b.length - a.length)
+      .slice(0, Math.min(5, paragraphs.length));
+    
+    sortedParagraphs.forEach(paragraph => {
+      // Make content more conversational
+      const conversational = paragraph
+        .replace(/\. ([A-Z])/g, '. Now, $1')
+        .replace(/However,/g, 'But here\'s the thing,')
+        .replace(/Furthermore,/g, 'What\'s more,')
+        .replace(/In conclusion,/g, 'To wrap this up,')
+        .replace(/Additionally,/g, 'Also,');
+      
+      keyPoints.push(conversational);
+    });
+    
+    return keyPoints;
+  };
 
   let script = '';
   
@@ -97,57 +71,40 @@ export const generatePodcastScript = (
     script += getIntro() + '\n\n';
   }
 
-  // Add content-type specific context
-  const contextIntros = {
-    tech: `Let's explore these technological innovations that are shaping our digital future.\n\n`,
-    health: `Let's dive into these important health insights that can improve our well-being.\n\n`,
-    business: `Let's examine these business strategies and entrepreneurial insights.\n\n`,
-    general: `Let's explore these fascinating insights from this ${metadata.readingTime} article.\n\n`
-  };
-
-  script += contextIntros[contentType] || contextIntros.general;
-
-  sections.slice(0, maxSections).forEach((section, index) => {
-    if (index > 0) {
-      const transitions = {
-        tech: [
-          'Now, let\'s explore another technological breakthrough...',
-          'Moving to our next innovation...',
-          'This brings us to another fascinating development...',
-          'Let\'s examine another key advancement...'
-        ],
-        health: [
-          'Another important aspect of our health journey...',
-          'Moving to our next wellness insight...',
-          'This leads us to another vital consideration...',
-          'Let\'s explore another health benefit...'
-        ],
-        business: [
-          'From a strategic perspective, let\'s examine...',
-          'Moving to our next business insight...',
-          'This brings us to another key opportunity...',
-          'Let\'s analyze another important factor...'
-        ],
-        general: [
-          'Moving on to our next point...',
-          'This brings us to another important aspect...',
-          'Now, let\'s explore...',
+  // Add content-specific context
+  const keyPoints = extractKeyPoints(articleContent);
+  
+  if (keyPoints.length === 0) {
+    script += `Let me share some insights from this ${contentType} content that I found particularly interesting.\n\n`;
+    script += `The main theme revolves around the ideas presented in "${title}". `;
+    script += articleContent.substring(0, 500) + (articleContent.length > 500 ? '...' : '') + '\n\n';
+  } else {
+    script += `Let me walk you through the key insights from this ${metadata.readingTime} article.\n\n`;
+    
+    keyPoints.forEach((point, index) => {
+      if (index > 0) {
+        const transitions = [
+          'Moving on to another important point...',
+          'Here\'s another fascinating aspect...',
+          'This brings me to the next key insight...',
+          'Now, let\'s explore this further...',
           'Building on that idea...'
-        ]
-      };
+        ];
+        script += transitions[index % transitions.length] + '\n\n';
+      }
       
-      const contentTransitions = transitions[contentType] || transitions.general;
-      script += contentTransitions[index % contentTransitions.length] + '\n\n';
-    }
-    
-    // Process section content to be more conversational
-    const conversationalSection = section
-      .replace(/\. /g, '. \n') // Add pauses
-      .replace(/([!?])/g, '$1 ') // Add emphasis pauses
-      .replace(/\n+/g, ' '); // Clean up line breaks
-    
-    script += conversationalSection + '\n\n';
-  });
+      script += point + '\n\n';
+      
+      // Add natural pauses and emphasis
+      if (index < keyPoints.length - 1) {
+        script += 'Let me pause here for a moment to let that sink in.\n\n';
+      }
+    });
+  }
+
+  // Add a summary section
+  script += `So, to summarize what we've covered in "${title}" - `;
+  script += `we've explored some really important ${contentType} insights that I think you'll find valuable in your own journey.\n\n`;
 
   if (options.includeOutro) {
     script += getOutro();
@@ -157,9 +114,13 @@ export const generatePodcastScript = (
 };
 
 export const estimateScriptDuration = (script: string): string => {
-  // Average speaking rate is about 150-160 words per minute for podcasts
-  const wordCount = script.split(' ').length;
-  const minutes = Math.ceil(wordCount / 155);
-  const seconds = Math.floor((wordCount % 155) / 2.6);
+  // More accurate duration estimation
+  const wordCount = script.split(' ').filter(word => word.length > 0).length;
+  const pauseCount = (script.match(/\.\s/g) || []).length;
+  const totalSeconds = Math.ceil((wordCount / 2.5) + (pauseCount * 0.5)); // 150 WPM + pause time
+  
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };

@@ -13,93 +13,183 @@ export interface ParsedContent {
 }
 
 export const parseUrlContent = async (url: string): Promise<ParsedContent> => {
-  // Simulate content parsing with different results based on URL
-  const domain = url.toLowerCase();
+  try {
+    // For demo purposes, we'll use a CORS proxy to fetch content
+    // In production, you'd want to use a proper backend service
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxyUrl);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch content');
+    }
+    
+    const data = await response.json();
+    const htmlContent = data.contents;
+    
+    // Parse HTML content
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    
+    // Extract title
+    let title = doc.querySelector('title')?.textContent || 
+                doc.querySelector('h1')?.textContent || 
+                'Untitled Article';
+    
+    // Clean title
+    title = title.trim().replace(/\s+/g, ' ');
+    
+    // Extract main content
+    let content = '';
+    const contentSelectors = [
+      'article',
+      '.post-content',
+      '.entry-content',
+      '.content',
+      'main',
+      '.article-body',
+      '.post-body'
+    ];
+    
+    let contentElement = null;
+    for (const selector of contentSelectors) {
+      contentElement = doc.querySelector(selector);
+      if (contentElement) break;
+    }
+    
+    if (!contentElement) {
+      // Fallback to body content
+      contentElement = doc.querySelector('body');
+    }
+    
+    if (contentElement) {
+      // Remove unwanted elements
+      const unwantedSelectors = [
+        'script', 'style', 'nav', 'header', 'footer', 
+        '.advertisement', '.ads', '.sidebar', '.menu',
+        '.social-share', '.comments', '.related-posts'
+      ];
+      
+      unwantedSelectors.forEach(selector => {
+        contentElement!.querySelectorAll(selector).forEach(el => el.remove());
+      });
+      
+      content = contentElement.textContent || '';
+    }
+    
+    // Clean and process content
+    content = cleanContent(content);
+    
+    // Determine content type based on content analysis
+    const contentType = analyzeContentType(title, content, url);
+    
+    // Suggest voice based on content type
+    const suggestedVoice = getSuggestedVoice(contentType);
+    
+    const wordCount = content.split(' ').filter(word => word.length > 0).length;
+    const readingTime = Math.ceil(wordCount / 200);
+    
+    // Extract author and date if possible
+    const author = extractAuthor(doc) || 'Unknown Author';
+    const publishDate = extractDate(doc) || new Date().toLocaleDateString();
+    
+    return {
+      title,
+      content,
+      contentType,
+      suggestedVoice,
+      metadata: {
+        wordCount,
+        readingTime: `${readingTime} min read`,
+        author,
+        publishDate
+      }
+    };
+    
+  } catch (error) {
+    console.error('Error parsing URL content:', error);
+    throw new Error('Failed to parse content from URL. Please try a different URL or paste the content directly.');
+  }
+};
+
+const analyzeContentType = (title: string, content: string, url: string): 'tech' | 'health' | 'business' | 'general' => {
+  const text = (title + ' ' + content + ' ' + url).toLowerCase();
   
-  let baseContent = '';
-  let title = '';
-  let contentType: 'tech' | 'health' | 'business' | 'general' = 'general';
-  let suggestedVoice = 'aria';
+  const techKeywords = ['technology', 'ai', 'artificial intelligence', 'software', 'programming', 'code', 'developer', 'tech', 'digital', 'computer', 'algorithm', 'machine learning', 'blockchain', 'cryptocurrency'];
+  const healthKeywords = ['health', 'medical', 'wellness', 'fitness', 'nutrition', 'doctor', 'medicine', 'healthcare', 'mental health', 'therapy', 'disease', 'treatment'];
+  const businessKeywords = ['business', 'startup', 'entrepreneur', 'marketing', 'finance', 'investment', 'company', 'corporate', 'management', 'strategy', 'leadership', 'economy'];
   
-  if (domain.includes('tech') || domain.includes('ai') || domain.includes('artificial')) {
-    contentType = 'tech';
-    suggestedVoice = 'charlie'; // Energetic voice for tech content
-    title = 'The Future of Artificial Intelligence in Modern Technology';
-    baseContent = `Artificial Intelligence is rapidly transforming our world in ways we never imagined. From healthcare to transportation, AI is revolutionizing industries and changing how we live and work.
+  const techScore = techKeywords.reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+  const healthScore = healthKeywords.reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+  const businessScore = businessKeywords.reduce((score, keyword) => score + (text.includes(keyword) ? 1 : 0), 0);
+  
+  if (techScore >= healthScore && techScore >= businessScore && techScore > 0) return 'tech';
+  if (healthScore >= businessScore && healthScore > 0) return 'health';
+  if (businessScore > 0) return 'business';
+  
+  return 'general';
+};
 
-Recent breakthroughs in machine learning have made AI more accessible and powerful than ever before. Natural language processing has reached new heights, enabling more human-like interactions between machines and humans.
+const getSuggestedVoice = (contentType: 'tech' | 'health' | 'business' | 'general'): string => {
+  const voiceMap = {
+    tech: 'charlie',
+    health: 'laura',
+    business: 'george',
+    general: 'aria'
+  };
+  
+  return voiceMap[contentType];
+};
 
-The integration of AI into everyday applications has accelerated dramatically, with new tools emerging that can write code, create art, and even compose music. Machine learning algorithms are now capable of understanding context, generating creative content, and solving complex problems that were previously thought to be uniquely human.
-
-As we move forward, the integration of AI into our daily lives will only continue to grow. The possibilities are endless, and we're just beginning to scratch the surface of what's possible. However, this transformation brings both opportunities and challenges that we must navigate carefully as a society.
-
-The key is to harness AI's power while maintaining human oversight and ethical standards. We must ensure that as AI becomes more prevalent, it serves to augment human capabilities rather than replace human judgment and creativity.`;
-  } else if (domain.includes('health') || domain.includes('medical') || domain.includes('wellness')) {
-    contentType = 'health';
-    suggestedVoice = 'laura'; // Calm voice for health content
-    title = 'Revolutionary Approaches to Modern Healthcare';
-    baseContent = `Healthcare is undergoing a digital transformation that promises to improve patient outcomes and reduce costs. From telemedicine to AI-powered diagnostics, technology is reshaping how we approach medical care.
-
-Wearable devices and mobile health apps are empowering patients to take control of their health like never before. These tools provide real-time monitoring and personalized insights that help prevent illness before it starts. Patients can now track everything from heart rate variability to sleep patterns, giving healthcare providers unprecedented visibility into their daily health metrics.
-
-The future of healthcare lies in personalized medicine based on individual genetic profiles and lifestyle factors. This approach ensures that each patient receives the most effective care tailored to their unique needs. Genomic sequencing is becoming more affordable and accessible, allowing for precision treatments that target specific genetic markers.
-
-Telemedicine has broken down geographical barriers, making quality healthcare accessible to remote and underserved communities. This democratization of healthcare is one of the most significant advances in modern medicine, allowing specialists to consult with patients regardless of location.
-
-Artificial intelligence is also playing a crucial role in diagnostics, with AI systems now able to detect diseases like cancer earlier and more accurately than traditional methods. This early detection capability can save countless lives and reduce treatment costs significantly.`;
-  } else if (domain.includes('business') || domain.includes('startup') || domain.includes('entrepreneur')) {
-    contentType = 'business';
-    suggestedVoice = 'george'; // Professional voice for business content
-    title = 'Building Successful Startups in the Digital Age';
-    baseContent = `The entrepreneurial landscape has evolved dramatically in recent years. Today's successful startups leverage technology, data, and innovative business models to create value and scale rapidly.
-
-Modern startups must focus on customer validation, lean operations, and rapid iteration. The days of building in isolation are over – today's entrepreneurs must engage with their market from day one. Customer feedback loops are essential for product development, and successful startups are those that can pivot quickly based on market demands.
-
-Cloud computing, artificial intelligence, and mobile technology have lowered the barriers to entry for new businesses. Small teams can now build and scale applications that reach millions of users without the massive infrastructure investments that were previously required.
-
-Building a strong company culture from the beginning is crucial for long-term success. Teams that share common values and vision are more likely to overcome challenges and achieve their goals. Remote work capabilities have also expanded the talent pool, allowing startups to hire the best talent regardless of geographic location.
-
-Access to funding has never been more diverse, with traditional VCs, angel investors, crowdfunding, and government grants all providing pathways for startup financing. The key is understanding which funding source aligns best with your business model and growth stage.
-
-The most successful startups of today are those that solve real problems with innovative solutions, maintain a strong focus on user experience, and build sustainable business models that can weather economic uncertainties.`;
-  } else {
-    contentType = 'general';
-    suggestedVoice = 'aria'; // Default voice for general content
-    title = 'Exploring New Horizons in Digital Innovation';
-    baseContent = `The digital landscape continues to evolve at an unprecedented pace, bringing new opportunities and challenges for individuals and organizations alike.
-
-Technology advancement is accelerating across multiple domains, creating new possibilities for solving complex problems and improving quality of life. From quantum computing to blockchain technology, emerging innovations are reshaping entire industries.
-
-Traditional industries are being disrupted by digital-first approaches that prioritize user experience, efficiency, and sustainability. Companies that embrace digital transformation are finding new ways to serve customers and create value.
-
-The next decade promises even more dramatic changes as emerging technologies mature and converge to create entirely new categories of products and services. Internet of Things, 5G networks, and edge computing are creating an increasingly connected world.
-
-Success in this rapidly changing environment requires continuous learning, flexibility, and a willingness to embrace new approaches to traditional challenges. Organizations must balance innovation with security and privacy concerns.
-
-The democratization of technology tools means that individuals and small teams can now create solutions that were previously only possible for large corporations. This shift is driving unprecedented innovation across all sectors of the economy.`;
+const extractAuthor = (doc: Document): string | undefined => {
+  const authorSelectors = [
+    '[rel="author"]',
+    '.author',
+    '.by-author',
+    '.post-author',
+    '[name="author"]',
+    '.article-author'
+  ];
+  
+  for (const selector of authorSelectors) {
+    const element = doc.querySelector(selector);
+    if (element) {
+      return element.textContent?.trim() || element.getAttribute('content')?.trim();
+    }
   }
   
-  const wordCount = baseContent.split(' ').length;
-  const readingTime = Math.ceil(wordCount / 200); // Average reading speed
+  return undefined;
+};
+
+const extractDate = (doc: Document): string | undefined => {
+  const dateSelectors = [
+    'time[datetime]',
+    '.published-date',
+    '.post-date',
+    '.article-date',
+    '[name="publication_date"]'
+  ];
   
-  return {
-    title,
-    content: baseContent,
-    contentType,
-    suggestedVoice,
-    metadata: {
-      wordCount,
-      readingTime: `${readingTime} min read`,
-      author: 'Content Author',
-      publishDate: new Date().toLocaleDateString()
+  for (const selector of dateSelectors) {
+    const element = doc.querySelector(selector);
+    if (element) {
+      const dateStr = element.getAttribute('datetime') || element.textContent?.trim();
+      if (dateStr) {
+        const date = new Date(dateStr);
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString();
+        }
+      }
     }
-  };
+  }
+  
+  return undefined;
 };
 
 export const cleanContent = (rawContent: string): string => {
-  // Simulate content cleaning - remove HTML tags, ads, etc.
   return rawContent
     .replace(/<[^>]*>/g, '') // Remove HTML tags
+    .replace(/&[a-zA-Z0-9#]+;/g, '') // Remove HTML entities
     .replace(/\s+/g, ' ') // Normalize whitespace
+    .replace(/\n\s*\n/g, '\n\n') // Clean up line breaks
     .trim();
 };
