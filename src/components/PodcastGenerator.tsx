@@ -42,6 +42,16 @@ const PodcastGenerator = () => {
       return;
     }
 
+    // Basic format validation
+    if (!apiKey.startsWith('sk_')) {
+      toast({
+        title: "Invalid API Key Format",
+        description: "ElevenLabs API keys should start with 'sk_'. Please check your API key.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsValidatingKey(true);
     try {
       console.log('Validating API key...');
@@ -49,9 +59,10 @@ const PodcastGenerator = () => {
       const validation = await ttsService.validateApiKey();
       
       if (!validation.isValid) {
+        console.error('API validation failed:', validation.error);
         toast({
-          title: "API Key Issue",
-          description: validation.error || "Please check your ElevenLabs API key and try again.",
+          title: "API Key Validation Failed",
+          description: validation.error || "Please check your ElevenLabs API key and permissions.",
           variant: "destructive"
         });
         return;
@@ -59,14 +70,14 @@ const PodcastGenerator = () => {
       
       toast({
         title: "API Key Validated ✅",
-        description: "Your API key is working! You can now create podcasts with enhanced features.",
+        description: "Your API key is working! You can now create podcasts.",
       });
       setStep('input');
     } catch (error) {
       console.error('API key validation error:', error);
       toast({
-        title: "Validation Failed",
-        description: "Failed to validate API key. Please check your internet connection and API key.",
+        title: "Validation Error",
+        description: "Failed to validate API key. Please check your internet connection and try again.",
         variant: "destructive"
       });
     } finally {
@@ -158,9 +169,9 @@ const PodcastGenerator = () => {
         <Card className="p-8 glass border-0 shadow-2xl max-w-md mx-auto">
           <div className="space-y-6">
             <div className="text-center">
-              <h3 className="text-xl font-semibold mb-2">Enhanced Setup</h3>
+              <h3 className="text-xl font-semibold mb-2">API Setup</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Configure your ElevenLabs API key and audio preferences for high-quality podcast generation.
+                Enter your ElevenLabs API key with proper permissions enabled.
               </p>
             </div>
             
@@ -170,7 +181,7 @@ const PodcastGenerator = () => {
                 <Input
                   id="apiKey"
                   type="password"
-                  placeholder="Enter your API key..."
+                  placeholder="sk_..."
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
@@ -183,12 +194,18 @@ const PodcastGenerator = () => {
                       rel="noopener noreferrer"
                       className="text-purple-400 hover:underline"
                     >
-                      ElevenLabs
+                      ElevenLabs Dashboard
                     </a>
                   </p>
-                  <p className="text-amber-500">
-                    ⚠️ Ensure your API key has text-to-speech and voices permissions
-                  </p>
+                  <div className="bg-amber-50 border border-amber-200 rounded p-2 mt-2">
+                    <p className="text-amber-700 font-medium text-xs">
+                      ⚠️ Required Permissions:
+                    </p>
+                    <ul className="text-amber-600 text-xs mt-1 space-y-1">
+                      <li>• voices_read</li>
+                      <li>• text_to_speech</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
 
@@ -222,9 +239,9 @@ const PodcastGenerator = () => {
             <Button 
               onClick={handleApiKeySubmit} 
               className="w-full"
-              disabled={isValidatingKey}
+              disabled={isValidatingKey || !apiKey.trim()}
             >
-              {isValidatingKey ? 'Validating API Key...' : 'Continue with Enhanced Setup'}
+              {isValidatingKey ? 'Validating API Key...' : 'Validate & Continue'}
             </Button>
           </div>
         </Card>

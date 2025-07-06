@@ -25,35 +25,7 @@ export class TTSService {
     try {
       console.log('Validating ElevenLabs API key...');
       
-      // First try to get user info (less permissions required)
-      const userResponse = await fetch(`${this.baseUrl}/user`, {
-        headers: {
-          'xi-api-key': this.apiKey,
-        },
-      });
-
-      if (userResponse.status === 401) {
-        const errorData = await userResponse.json().catch(() => ({}));
-        if (errorData.detail?.message?.includes('missing_permissions')) {
-          return {
-            isValid: false,
-            error: 'API key lacks required permissions. Please ensure your ElevenLabs API key has text-to-speech and voices permissions enabled.'
-          };
-        }
-        return {
-          isValid: false,
-          error: 'Invalid API key. Please check your ElevenLabs API key.'
-        };
-      }
-
-      if (!userResponse.ok) {
-        return {
-          isValid: false,
-          error: `API validation failed with status: ${userResponse.status}`
-        };
-      }
-
-      // If user endpoint works, try voices endpoint
+      // Try voices endpoint first as it requires fewer permissions
       const voicesResponse = await fetch(`${this.baseUrl}/voices`, {
         headers: {
           'xi-api-key': this.apiKey,
@@ -61,26 +33,43 @@ export class TTSService {
       });
 
       if (voicesResponse.status === 401) {
+        const errorData = await voicesResponse.json().catch(() => ({}));
+        console.log('Voices API error:', errorData);
+        
+        if (errorData.detail?.message?.includes('missing_permissions')) {
+          return {
+            isValid: false,
+            error: 'Your API key is missing required permissions. Please ensure it has "voices_read" and "text_to_speech" permissions enabled in your ElevenLabs account.'
+          };
+        }
         return {
           isValid: false,
-          error: 'API key lacks voices permissions. Please upgrade your ElevenLabs plan or contact support.'
+          error: 'Invalid API key. Please check your ElevenLabs API key is correct.'
         };
       }
 
       if (!voicesResponse.ok) {
         return {
           isValid: false,
-          error: 'Unable to access voices. Please check your API key permissions.'
+          error: `API validation failed with status: ${voicesResponse.status}. Please check your API key.`
         };
       }
 
-      console.log('API key validation successful');
+      const voicesData = await voicesResponse.json();
+      if (!voicesData.voices || voicesData.voices.length === 0) {
+        return {
+          isValid: false,
+          error: 'No voices available with this API key. Please check your ElevenLabs subscription.'
+        };
+      }
+
+      console.log('API key validation successful - voices accessible');
       return { isValid: true };
     } catch (error) {
       console.error('API key validation failed:', error);
       return {
         isValid: false,
-        error: 'Network error during validation. Please check your internet connection.'
+        error: 'Network error during validation. Please check your internet connection and API key format.'
       };
     }
   }
@@ -149,20 +138,14 @@ export class TTSService {
     } = options;
 
     try {
-      console.log('Starting TTS generation with improved settings...');
-      
-      // Validate API key first
-      const validation = await this.validateApiKey();
-      if (!validation.isValid) {
-        throw new Error(validation.error || 'Invalid API key');
-      }
+      console.log('Starting TTS generation...');
       
       // Generate subtitles with speed adjustment
       const subtitles = this.generateSubtitles(text, speed);
       
       // Chunk text for better processing
-      const chunks = this.chunkText(text, 1500); // Smaller chunks for better reliability
-      console.log(`Processing ${chunks.length} text chunks for better quality`);
+      const chunks = this.chunkText(text, 1500);
+      console.log(`Processing ${chunks.length} text chunks`);
       
       const audioBlobs: Blob[] = [];
       
@@ -193,7 +176,7 @@ export class TTSService {
           console.error('TTS API Error Response:', errorText);
           
           if (response.status === 401) {
-            throw new Error('API key is invalid or lacks required permissions for text-to-speech.');
+            throw new Error('API key is invalid or lacks text-to-speech permissions. Please check your ElevenLabs API key permissions.');
           }
           
           throw new Error(`TTS API error: ${response.status} - ${errorText}`);
@@ -202,13 +185,12 @@ export class TTSService {
         const audioBlob = await response.blob();
         audioBlobs.push(audioBlob);
         
-        // Shorter delay between requests
         if (i < chunks.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
       
-      // Use the first chunk for now (in production, you'd concatenate)
+      // Use the first chunk for now
       const finalBlob = audioBlobs[0];
       
       if (audioBlobs.length > 1) {
