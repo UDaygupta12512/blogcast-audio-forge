@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import BlogInput from './BlogInput';
 import ProcessingSteps from './ProcessingSteps';
@@ -47,12 +46,12 @@ const PodcastGenerator = () => {
     try {
       console.log('Validating API key...');
       const ttsService = new TTSService(apiKey);
-      const isValid = await ttsService.validateApiKey();
+      const validation = await ttsService.validateApiKey();
       
-      if (!isValid) {
+      if (!validation.isValid) {
         toast({
-          title: "Invalid API Key",
-          description: "Please check your ElevenLabs API key and try again. Make sure it has the required permissions.",
+          title: "API Key Issue",
+          description: validation.error || "Please check your ElevenLabs API key and try again.",
           variant: "destructive"
         });
         return;
@@ -175,17 +174,22 @@ const PodcastGenerator = () => {
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Get your API key from{' '}
-                  <a 
-                    href="https://elevenlabs.io/api" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-purple-400 hover:underline"
-                  >
-                    ElevenLabs
-                  </a>
-                </p>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>
+                    Get your API key from{' '}
+                    <a 
+                      href="https://elevenlabs.io/api" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-purple-400 hover:underline"
+                    >
+                      ElevenLabs
+                    </a>
+                  </p>
+                  <p className="text-amber-500">
+                    ⚠️ Ensure your API key has text-to-speech and voices permissions
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-2">

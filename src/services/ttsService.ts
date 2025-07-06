@@ -1,4 +1,3 @@
-
 export interface TTSOptions {
   text: string;
   voiceId: string;
@@ -22,18 +21,67 @@ export class TTSService {
     this.apiKey = apiKey;
   }
 
-  async validateApiKey(): Promise<boolean> {
+  async validateApiKey(): Promise<{ isValid: boolean; error?: string }> {
     try {
-      // Use voices endpoint instead of user endpoint for validation
-      const response = await fetch(`${this.baseUrl}/voices`, {
+      console.log('Validating ElevenLabs API key...');
+      
+      // First try to get user info (less permissions required)
+      const userResponse = await fetch(`${this.baseUrl}/user`, {
         headers: {
           'xi-api-key': this.apiKey,
         },
       });
-      return response.ok;
+
+      if (userResponse.status === 401) {
+        const errorData = await userResponse.json().catch(() => ({}));
+        if (errorData.detail?.message?.includes('missing_permissions')) {
+          return {
+            isValid: false,
+            error: 'API key lacks required permissions. Please ensure your ElevenLabs API key has text-to-speech and voices permissions enabled.'
+          };
+        }
+        return {
+          isValid: false,
+          error: 'Invalid API key. Please check your ElevenLabs API key.'
+        };
+      }
+
+      if (!userResponse.ok) {
+        return {
+          isValid: false,
+          error: `API validation failed with status: ${userResponse.status}`
+        };
+      }
+
+      // If user endpoint works, try voices endpoint
+      const voicesResponse = await fetch(`${this.baseUrl}/voices`, {
+        headers: {
+          'xi-api-key': this.apiKey,
+        },
+      });
+
+      if (voicesResponse.status === 401) {
+        return {
+          isValid: false,
+          error: 'API key lacks voices permissions. Please upgrade your ElevenLabs plan or contact support.'
+        };
+      }
+
+      if (!voicesResponse.ok) {
+        return {
+          isValid: false,
+          error: 'Unable to access voices. Please check your API key permissions.'
+        };
+      }
+
+      console.log('API key validation successful');
+      return { isValid: true };
     } catch (error) {
       console.error('API key validation failed:', error);
-      return false;
+      return {
+        isValid: false,
+        error: 'Network error during validation. Please check your internet connection.'
+      };
     }
   }
 
@@ -103,11 +151,17 @@ export class TTSService {
     try {
       console.log('Starting TTS generation with improved settings...');
       
+      // Validate API key first
+      const validation = await this.validateApiKey();
+      if (!validation.isValid) {
+        throw new Error(validation.error || 'Invalid API key');
+      }
+      
       // Generate subtitles with speed adjustment
       const subtitles = this.generateSubtitles(text, speed);
       
       // Chunk text for better processing
-      const chunks = this.chunkText(text, 2500);
+      const chunks = this.chunkText(text, 1500); // Smaller chunks for better reliability
       console.log(`Processing ${chunks.length} text chunks for better quality`);
       
       const audioBlobs: Blob[] = [];
@@ -131,16 +185,17 @@ export class TTSService {
               style: 0.2,
               use_speaker_boost: true,
             },
-            pronunciation_dictionary_locators: [],
-            seed: null,
-            previous_text: i > 0 ? chunks[i - 1].slice(-100) : null,
-            next_text: i < chunks.length - 1 ? chunks[i + 1].slice(0, 100) : null,
           }),
         });
 
         if (!response.ok) {
           const errorText = await response.text();
           console.error('TTS API Error Response:', errorText);
+          
+          if (response.status === 401) {
+            throw new Error('API key is invalid or lacks required permissions for text-to-speech.');
+          }
+          
           throw new Error(`TTS API error: ${response.status} - ${errorText}`);
         }
 
@@ -149,7 +204,7 @@ export class TTSService {
         
         // Shorter delay between requests
         if (i < chunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
       
