@@ -25,51 +25,54 @@ export class TTSService {
     try {
       console.log('Validating ElevenLabs API key...');
       
-      // Try voices endpoint first as it requires fewer permissions
-      const voicesResponse = await fetch(`${this.baseUrl}/voices`, {
+      const response = await fetch(`${this.baseUrl}/voices`, {
         headers: {
           'xi-api-key': this.apiKey,
         },
       });
 
-      if (voicesResponse.status === 401) {
-        const errorData = await voicesResponse.json().catch(() => ({}));
-        console.log('Voices API error:', errorData);
+      if (response.status === 401) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('API validation error:', errorData);
         
-        if (errorData.detail?.message?.includes('missing_permissions')) {
+        if (errorData.detail?.status === 'detected_unusual_activity') {
           return {
             isValid: false,
-            error: 'Your API key is missing required permissions. Please ensure it has "voices_read" and "text_to_speech" permissions enabled in your ElevenLabs account.'
+            error: 'ElevenLabs has detected unusual activity. This often happens with free tier accounts. Please upgrade to a paid plan or try again later without VPN/proxy.'
           };
         }
+        
         return {
           isValid: false,
-          error: 'Invalid API key. Please check your ElevenLabs API key is correct.'
+          error: 'Invalid API key. Please check your ElevenLabs API key is correct and has the required permissions.'
         };
       }
 
-      if (!voicesResponse.ok) {
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.log('API error:', errorData);
+        
         return {
           isValid: false,
-          error: `API validation failed with status: ${voicesResponse.status}. Please check your API key.`
+          error: `API validation failed: ${response.status}. Please check your API key and account status.`
         };
       }
 
-      const voicesData = await voicesResponse.json();
-      if (!voicesData.voices || voicesData.voices.length === 0) {
+      const data = await response.json();
+      if (!data.voices || data.voices.length === 0) {
         return {
           isValid: false,
-          error: 'No voices available with this API key. Please check your ElevenLabs subscription.'
+          error: 'No voices available. Please check your ElevenLabs subscription and API key permissions.'
         };
       }
 
-      console.log('API key validation successful - voices accessible');
+      console.log('API key validation successful');
       return { isValid: true };
     } catch (error) {
       console.error('API key validation failed:', error);
       return {
         isValid: false,
-        error: 'Network error during validation. Please check your internet connection and API key format.'
+        error: 'Network error during validation. Please check your internet connection.'
       };
     }
   }
@@ -110,7 +113,6 @@ export class TTSService {
       const trimmedSentence = sentence.trim();
       if (trimmedSentence.length === 0) return;
       
-      // Adjust duration based on speed and word count
       const wordCount = trimmedSentence.split(' ').length;
       const baseDuration = Math.max(1.5, wordCount / 2.2);
       const duration = baseDuration / speed;
@@ -140,10 +142,7 @@ export class TTSService {
     try {
       console.log('Starting TTS generation...');
       
-      // Generate subtitles with speed adjustment
       const subtitles = this.generateSubtitles(text, speed);
-      
-      // Chunk text for better processing
       const chunks = this.chunkText(text, 1500);
       console.log(`Processing ${chunks.length} text chunks`);
       
@@ -172,34 +171,37 @@ export class TTSService {
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('TTS API Error Response:', errorText);
+          const errorData = await response.json().catch(() => ({}));
+          console.error('TTS API Error:', errorData);
           
-          if (response.status === 401) {
-            throw new Error('API key is invalid or lacks text-to-speech permissions. Please check your ElevenLabs API key permissions.');
+          // Handle specific ElevenLabs errors
+          if (errorData.detail?.status === 'detected_unusual_activity') {
+            throw new Error('ElevenLabs detected unusual activity. Free tier accounts may be limited. Please upgrade to a paid plan or disable VPN/proxy and try again.');
           }
           
-          throw new Error(`TTS API error: ${response.status} - ${errorText}`);
+          if (response.status === 401) {
+            throw new Error('API key authentication failed. Please check your ElevenLabs API key and account status.');
+          }
+          
+          if (response.status === 429) {
+            throw new Error('Rate limit exceeded. Please wait a moment and try again, or upgrade your ElevenLabs plan.');
+          }
+          
+          throw new Error(`TTS generation failed: ${errorData.detail?.message || `HTTP ${response.status}`}`);
         }
 
         const audioBlob = await response.blob();
         audioBlobs.push(audioBlob);
         
         if (i < chunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
       }
       
-      // Use the first chunk for now
       const finalBlob = audioBlobs[0];
-      
-      if (audioBlobs.length > 1) {
-        console.log('Multiple audio chunks generated. Using first chunk for demo.');
-      }
-      
       const audioUrl = URL.createObjectURL(finalBlob);
-      console.log('TTS generation completed successfully');
       
+      console.log('TTS generation completed successfully');
       return { audioUrl, subtitles };
     } catch (error) {
       console.error('TTS generation failed:', error);
@@ -228,7 +230,6 @@ export class TTSService {
   }
 }
 
-// Enhanced voice options with more variety
 export const VOICE_IDS = {
   aria: '9BWtsMINqrJLrRacOk9x',
   sarah: 'EXAVITQu4vr4xnSDxMaL',

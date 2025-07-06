@@ -8,9 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { generatePodcastScript, estimateScriptDuration } from '../utils/scriptGenerator';
 import { TTSService, VOICE_IDS, type SubtitleSegment } from '../services/ttsService';
 import { useToast } from '@/hooks/use-toast';
+import { AlertTriangle, ExternalLink } from 'lucide-react';
 
 export interface PodcastData {
   title: string;
@@ -42,16 +44,6 @@ const PodcastGenerator = () => {
       return;
     }
 
-    // Basic format validation
-    if (!apiKey.startsWith('sk_')) {
-      toast({
-        title: "Invalid API Key Format",
-        description: "ElevenLabs API keys should start with 'sk_'. Please check your API key.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     setIsValidatingKey(true);
     try {
       console.log('Validating API key...');
@@ -61,8 +53,8 @@ const PodcastGenerator = () => {
       if (!validation.isValid) {
         console.error('API validation failed:', validation.error);
         toast({
-          title: "API Key Validation Failed",
-          description: validation.error || "Please check your ElevenLabs API key and permissions.",
+          title: "API Key Issue",
+          description: validation.error || "Please check your ElevenLabs API key.",
           variant: "destructive"
         });
         return;
@@ -77,7 +69,7 @@ const PodcastGenerator = () => {
       console.error('API key validation error:', error);
       toast({
         title: "Validation Error",
-        description: "Failed to validate API key. Please check your internet connection and try again.",
+        description: "Failed to validate API key. Please check your connection and try again.",
         variant: "destructive"
       });
     } finally {
@@ -89,9 +81,8 @@ const PodcastGenerator = () => {
     setStep('processing');
     
     try {
-      console.log('Starting enhanced podcast generation...');
+      console.log('Starting podcast generation...');
       
-      // Generate enhanced script
       const script = generatePodcastScript(content, {
         ...options,
         quality: audioQuality,
@@ -107,7 +98,6 @@ const PodcastGenerator = () => {
         music: options.music
       });
 
-      // Generate audio with enhanced settings
       setIsGeneratingAudio(true);
       const ttsService = new TTSService(apiKey);
       const voiceId = VOICE_IDS[options.voice as keyof typeof VOICE_IDS] || VOICE_IDS.aria;
@@ -128,13 +118,11 @@ const PodcastGenerator = () => {
       
       toast({
         title: "🎉 Podcast Generated Successfully!",
-        description: "Your enhanced podcast with subtitles and controls is ready!",
+        description: "Your podcast is ready to listen!",
       });
     } catch (error) {
       console.error('Error generating podcast:', error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "Failed to generate audio. Please check your API key and try again.";
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate podcast";
       
       toast({
         title: "Generation Failed",
@@ -161,17 +149,32 @@ const PodcastGenerator = () => {
             AI-Powered Podcast Creation
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Transform any blog post into a professional podcast episode with AI narration, 
-            background music, and sound effects.
+            Transform any blog post into a professional podcast episode with AI narration.
           </p>
         </div>
+
+        <Alert className="max-w-2xl mx-auto border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            <strong>Important:</strong> This app requires a paid ElevenLabs account. 
+            Free tier accounts may experience limitations or blocks due to abuse detection.
+            <a 
+              href="https://elevenlabs.io/pricing" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 ml-2 text-amber-600 hover:text-amber-700 underline"
+            >
+              View Pricing <ExternalLink className="w-3 h-3" />
+            </a>
+          </AlertDescription>
+        </Alert>
 
         <Card className="p-8 glass border-0 shadow-2xl max-w-md mx-auto">
           <div className="space-y-6">
             <div className="text-center">
               <h3 className="text-xl font-semibold mb-2">API Setup</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Enter your ElevenLabs API key with proper permissions enabled.
+                Enter your ElevenLabs API key to get started.
               </p>
             </div>
             
@@ -197,15 +200,6 @@ const PodcastGenerator = () => {
                       ElevenLabs Dashboard
                     </a>
                   </p>
-                  <div className="bg-amber-50 border border-amber-200 rounded p-2 mt-2">
-                    <p className="text-amber-700 font-medium text-xs">
-                      ⚠️ Required Permissions:
-                    </p>
-                    <ul className="text-amber-600 text-xs mt-1 space-y-1">
-                      <li>• voices_read</li>
-                      <li>• text_to_speech</li>
-                    </ul>
-                  </div>
                 </div>
               </div>
 
@@ -256,8 +250,7 @@ const PodcastGenerator = () => {
           AI-Powered Podcast Creation
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Transform any blog post into a professional podcast episode with AI narration, 
-          background music, and sound effects.
+          Transform any blog post into a professional podcast episode with AI narration.
         </p>
       </div>
 
@@ -267,9 +260,9 @@ const PodcastGenerator = () => {
           <ProcessingSteps 
             customSteps={[
               'Parsing and analyzing content',
-              'Generating enhanced podcast script',
+              'Generating podcast script',
               'Optimizing for selected voice',
-              isGeneratingAudio ? 'Converting to high-quality speech...' : 'Preparing audio generation'
+              isGeneratingAudio ? 'Converting to speech...' : 'Preparing audio generation'
             ]}
           />
         )}
