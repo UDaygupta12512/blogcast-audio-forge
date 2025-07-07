@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import BlogInput from './BlogInput';
 import ProcessingSteps from './ProcessingSteps';
@@ -11,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { generatePodcastScript, estimateScriptDuration } from '../utils/scriptGenerator';
 import { FreeTTSService, FREE_VOICE_OPTIONS, type SubtitleSegment } from '../services/freeTtsService';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle, Volume2 } from 'lucide-react';
+import { Volume2 } from 'lucide-react';
 
 export interface PodcastData {
   title: string;
@@ -140,14 +141,6 @@ const PodcastGenerator = () => {
             Transform any blog post into a podcast with free browser-based speech synthesis and subtitles.
           </p>
         </div>
-
-        <Alert className="max-w-2xl mx-auto border-green-200 bg-green-50">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">
-            <strong>Completely Free!</strong> This app uses your browser's built-in speech synthesis. 
-            No API key required, works offline, and includes subtitle generation.
-          </AlertDescription>
-        </Alert>
 
         <Card className="p-8 glass border-0 shadow-2xl max-w-md mx-auto">
           <div className="space-y-6">
