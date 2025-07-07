@@ -1,4 +1,3 @@
-
 export interface ParsedContent {
   title: string;
   content: string;
@@ -14,70 +13,134 @@ export interface ParsedContent {
 
 export const parseUrlContent = async (url: string): Promise<ParsedContent> => {
   try {
-    // For demo purposes, we'll use a CORS proxy to fetch content
-    // In production, you'd want to use a proper backend service
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
+    console.log('Attempting to parse URL:', url);
     
-    if (!response.ok) {
-      throw new Error('Failed to fetch content');
+    // Try multiple CORS proxy services as fallbacks
+    const proxyServices = [
+      `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+      `https://corsproxy.io/?${encodeURIComponent(url)}`,
+      `https://cors-anywhere.herokuapp.com/${url}`
+    ];
+    
+    let response: Response | null = null;
+    let htmlContent = '';
+    
+    // Try each proxy service
+    for (let i = 0; i < proxyServices.length; i++) {
+      try {
+        console.log(`Trying proxy service ${i + 1}:`, proxyServices[i]);
+        response = await fetch(proxyServices[i], {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          htmlContent = data.contents || data;
+          console.log('Successfully fetched content with proxy', i + 1);
+          break;
+        }
+      } catch (error) {
+        console.log(`Proxy service ${i + 1} failed:`, error);
+        continue;
+      }
     }
     
-    const data = await response.json();
-    const htmlContent = data.contents;
+    // If all proxies fail, try direct fetch (will likely fail due to CORS but worth trying)
+    if (!htmlContent) {
+      try {
+        console.log('Trying direct fetch as last resort...');
+        response = await fetch(url);
+        if (response.ok) {
+          htmlContent = await response.text();
+          console.log('Direct fetch successful');
+        }
+      } catch (error) {
+        console.log('Direct fetch failed:', error);
+      }
+    }
+    
+    if (!htmlContent) {
+      throw new Error('All content fetching methods failed. The URL might be blocking requests or the content is not accessible.');
+    }
     
     // Parse HTML content
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlContent, 'text/html');
     
-    // Extract title
+    // Extract title with better fallbacks
     let title = doc.querySelector('title')?.textContent || 
                 doc.querySelector('h1')?.textContent || 
+                doc.querySelector('[property="og:title"]')?.getAttribute('content') ||
+                doc.querySelector('[name="twitter:title"]')?.getAttribute('content') ||
                 'Untitled Article';
     
     // Clean title
-    title = title.trim().replace(/\s+/g, ' ');
+    title = title.trim().replace(/\s+/g, ' ').substring(0, 100);
     
-    // Extract main content
+    // Extract main content with improved selectors
     let content = '';
     const contentSelectors = [
       'article',
+      '[role="main"]',
+      'main',
       '.post-content',
       '.entry-content',
+      '.article-content',
       '.content',
-      'main',
       '.article-body',
-      '.post-body'
+      '.post-body',
+      '.blog-content',
+      '[property="articleBody"]'
     ];
     
     let contentElement = null;
     for (const selector of contentSelectors) {
       contentElement = doc.querySelector(selector);
-      if (contentElement) break;
+      if (contentElement && contentElement.textContent && contentElement.textContent.length > 100) {
+        break;
+      }
     }
     
-    if (!contentElement) {
-      // Fallback to body content
-      contentElement = doc.querySelector('body');
+    if (!contentElement || !contentElement.textContent || contentElement.textContent.length < 100) {
+      // Fallback to paragraphs if main content not found
+      const paragraphs = Array.from(doc.querySelectorAll('p'));
+      const longParagraphs = paragraphs.filter(p => p.textContent && p.textContent.length > 50);
+      
+      if (longParagraphs.length > 0) {
+        content = longParagraphs.map(p => p.textContent).join('\n\n');
+      } else {
+        // Last resort - use body but filter out common noise
+        contentElement = doc.querySelector('body');
+      }
     }
     
-    if (contentElement) {
+    if (contentElement && !content) {
       // Remove unwanted elements
       const unwantedSelectors = [
         'script', 'style', 'nav', 'header', 'footer', 
         '.advertisement', '.ads', '.sidebar', '.menu',
-        '.social-share', '.comments', '.related-posts'
+        '.social-share', '.comments', '.related-posts',
+        '.cookie-notice', '.popup', '.modal'
       ];
       
+      const clonedElement = contentElement.cloneNode(true) as Element;
       unwantedSelectors.forEach(selector => {
-        contentElement!.querySelectorAll(selector).forEach(el => el.remove());
+        clonedElement.querySelectorAll(selector).forEach(el => el.remove());
       });
       
-      content = contentElement.textContent || '';
+      content = clonedElement.textContent || '';
     }
     
     // Clean and process content
     content = cleanContent(content);
+    
+    // Validate content length
+    if (content.length < 100) {
+      throw new Error('The extracted content is too short. The page might not contain readable text or might be dynamically loaded.');
+    }
     
     // Determine content type based on content analysis
     const contentType = analyzeContentType(title, content, url);
@@ -91,6 +154,8 @@ export const parseUrlContent = async (url: string): Promise<ParsedContent> => {
     // Extract author and date if possible
     const author = extractAuthor(doc) || 'Unknown Author';
     const publishDate = extractDate(doc) || new Date().toLocaleDateString();
+    
+    console.log('Successfully parsed content:', { title, wordCount, contentType });
     
     return {
       title,
@@ -107,7 +172,7 @@ export const parseUrlContent = async (url: string): Promise<ParsedContent> => {
     
   } catch (error) {
     console.error('Error parsing URL content:', error);
-    throw new Error('Failed to parse content from URL. Please try a different URL or paste the content directly.');
+    throw new Error(`Failed to parse content from URL: ${error instanceof Error ? error.message : 'Unknown error'}. Please try a different URL or paste the content directly.`);
   }
 };
 
@@ -147,7 +212,9 @@ const extractAuthor = (doc: Document): string | undefined => {
     '.by-author',
     '.post-author',
     '[name="author"]',
-    '.article-author'
+    '.article-author',
+    '[property="article:author"]',
+    '[name="twitter:creator"]'
   ];
   
   for (const selector of authorSelectors) {
@@ -166,7 +233,9 @@ const extractDate = (doc: Document): string | undefined => {
     '.published-date',
     '.post-date',
     '.article-date',
-    '[name="publication_date"]'
+    '[name="publication_date"]',
+    '[property="article:published_time"]',
+    '[name="twitter:data1"]'
   ];
   
   for (const selector of dateSelectors) {
@@ -188,8 +257,9 @@ const extractDate = (doc: Document): string | undefined => {
 export const cleanContent = (rawContent: string): string => {
   return rawContent
     .replace(/<[^>]*>/g, '') // Remove HTML tags
-    .replace(/&[a-zA-Z0-9#]+;/g, '') // Remove HTML entities
+    .replace(/&[a-zA-Z0-9#]+;/g, ' ') // Remove HTML entities
     .replace(/\s+/g, ' ') // Normalize whitespace
     .replace(/\n\s*\n/g, '\n\n') // Clean up line breaks
+    .replace(/[^\w\s.,!?;:()\-'"]/g, ' ') // Remove special characters except basic punctuation
     .trim();
 };
