@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Play, Pause, Download, Share2, RotateCcw, Subtitles, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Download, Share2, RotateCcw, Subtitles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import AudioControls from './AudioControls';
 import { FreeTTSService } from '../services/freeTtsService';
@@ -67,38 +66,71 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   }, [isPlaying, podcastData.subtitles, showSubtitles]);
 
   const togglePlayback = async () => {
-    if (!ttsServiceRef.current) return;
+    if (!ttsServiceRef.current) {
+      console.error('TTS service not initialized');
+      toast({
+        title: "Audio Error",
+        description: "Speech synthesis service not available. Please refresh the page.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     if (isPlaying) {
+      console.log('Stopping speech synthesis');
       ttsServiceRef.current.stop();
       setIsPlaying(false);
+      setCurrentTime(0);
     } else {
       try {
-        setIsPlaying(true);
-        setCurrentTime(0);
-        
-        await ttsServiceRef.current.speak({
-          text: podcastData.script,
+        console.log('Starting speech synthesis with settings:', {
           voice: podcastData.voice,
           rate: playbackRate,
           volume: isMuted ? 0 : volume / 100,
+          textLength: podcastData.script.length
+        });
+        
+        setIsPlaying(true);
+        setCurrentTime(0);
+        
+        // Ensure volume is set correctly
+        const effectiveVolume = isMuted ? 0 : Math.max(0.1, volume / 100);
+        
+        await ttsServiceRef.current.speak({
+          text: podcastData.script,
+          voice: podcastData.voice === 'default' ? undefined : podcastData.voice,
+          rate: playbackRate,
+          pitch: 1,
+          volume: effectiveVolume,
         });
         
         // Speech ended naturally
+        console.log('Speech synthesis completed');
         setIsPlaying(false);
         setCurrentTime(0);
         
       } catch (error) {
         console.error('Playback error:', error);
         setIsPlaying(false);
+        setCurrentTime(0);
         toast({
           title: "Playback Error",
-          description: "Failed to play audio. Please try again.",
+          description: "Failed to play audio. Please try again or check your browser's audio settings.",
           variant: "destructive"
         });
       }
     }
   };
+
+  // Update volume in real-time
+  useEffect(() => {
+    if (ttsServiceRef.current && isPlaying) {
+      const effectiveVolume = isMuted ? 0 : volume / 100;
+      console.log('Updating volume to:', effectiveVolume);
+      // Note: Web Speech API doesn't support real-time volume changes during playback
+      // This will apply to the next playback
+    }
+  }, [volume, isMuted, isPlaying]);
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds)) return '0:00';
@@ -145,6 +177,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         <p className="text-muted-foreground">
           Click play to listen with real-time subtitles
         </p>
+        <p className="text-sm text-yellow-600 mt-2">
+          💡 If audio is not audible, check your browser's audio settings and ensure volume is up
+        </p>
       </div>
 
       <Card className="p-6 bg-gradient-to-br from-purple-900/20 to-blue-900/20 border-purple-500/20">
@@ -152,7 +187,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           <div className="text-center">
             <h4 className="text-lg font-semibold text-purple-200">{podcastData.title}</h4>
             <p className="text-sm text-muted-foreground">
-              Duration: ~{formatTime(duration)} • Free Browser TTS • Voice: {podcastData.voice || 'Default'}
+              Duration: ~{formatTime(duration)} • Volume: {isMuted ? '0' : volume}% • Speed: {playbackRate}x
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Voice: {podcastData.voice || 'Browser Default'}
             </p>
           </div>
 
@@ -264,7 +302,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           variant="outline"
           size="sm"
         >
-          {showControls ? 'Hide' : 'Show'} Controls
+          {showControls ? 'Hide' : 'Show'} Audio Controls
         </Button>
       </div>
 

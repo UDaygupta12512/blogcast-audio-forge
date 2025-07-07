@@ -24,12 +24,16 @@ export class FreeTTSService {
   }
 
   private loadVoices(): void {
-    this.voices = this.synth.getVoices();
+    // Load voices with a small delay to ensure they're available
+    const loadVoicesWithDelay = () => {
+      this.voices = this.synth.getVoices();
+      console.log('Available voices:', this.voices.map(v => v.name));
+    };
+
+    loadVoicesWithDelay();
     
     if (this.voices.length === 0) {
-      this.synth.addEventListener('voiceschanged', () => {
-        this.voices = this.synth.getVoices();
-      });
+      this.synth.addEventListener('voiceschanged', loadVoicesWithDelay);
     }
   }
 
@@ -39,6 +43,15 @@ export class FreeTTSService {
         isValid: false,
         error: 'Speech synthesis not supported in this browser. Please use Chrome, Firefox, or Edge.'
       };
+    }
+    
+    // Test audio context availability
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContext.close();
+      console.log('Audio context available');
+    } catch (error) {
+      console.warn('Audio context may not be available:', error);
     }
     
     return { isValid: true };
@@ -73,7 +86,7 @@ export class FreeTTSService {
   }
 
   async generateAudio(options: FreeTTSOptions): Promise<{ audioUrl: string; subtitles: SubtitleSegment[] }> {
-    const { text, voice, rate = 1, pitch = 1, volume = 1 } = options;
+    const { text, rate = 1 } = options;
     
     console.log('Starting free TTS generation...');
     
@@ -89,43 +102,83 @@ export class FreeTTSService {
   speak(options: FreeTTSOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const { text, voice, rate = 1, pitch = 1, volume = 1 } = options;
+        const { text, voice, rate = 1, pitch = 1, volume = 0.75 } = options;
+        
+        console.log('Speech synthesis starting with options:', { voice, rate, pitch, volume, textLength: text.length });
         
         // Stop any current speech
         this.synth.cancel();
         
-        this.currentUtterance = new SpeechSynthesisUtterance(text);
-        
-        // Find the selected voice
-        const selectedVoice = this.voices.find(v => v.name === voice) || this.voices[0];
-        if (selectedVoice) {
-          this.currentUtterance.voice = selectedVoice;
-        }
-        
-        this.currentUtterance.rate = rate;
-        this.currentUtterance.pitch = pitch;
-        this.currentUtterance.volume = volume;
-        
-        this.currentUtterance.onend = () => {
-          console.log('Speech synthesis completed');
-          resolve();
-        };
-        
-        this.currentUtterance.onerror = (error) => {
-          console.error('Speech synthesis error:', error);
-          reject(new Error('Speech synthesis failed'));
-        };
-        
-        this.synth.speak(this.currentUtterance);
+        // Wait a bit for cancel to complete
+        setTimeout(() => {
+          this.currentUtterance = new SpeechSynthesisUtterance(text);
+          
+          // Find the selected voice
+          if (voice && voice !== 'default') {
+            const selectedVoice = this.voices.find(v => 
+              v.name === voice || 
+              v.name.includes(voice) ||
+              voice.includes(v.name)
+            );
+            if (selectedVoice) {
+              console.log('Using voice:', selectedVoice.name);
+              this.currentUtterance.voice = selectedVoice;
+            } else {
+              console.log('Voice not found, using default. Available voices:', this.voices.map(v => v.name));
+            }
+          }
+          
+          // Set speech parameters with safe values
+          this.currentUtterance.rate = Math.max(0.1, Math.min(2, rate));
+          this.currentUtterance.pitch = Math.max(0, Math.min(2, pitch));
+          this.currentUtterance.volume = Math.max(0, Math.min(1, volume));
+          
+          console.log('Final speech settings:', {
+            rate: this.currentUtterance.rate,
+            pitch: this.currentUtterance.pitch,
+            volume: this.currentUtterance.volume,
+            voice: this.currentUtterance.voice?.name || 'default'
+          });
+          
+          this.currentUtterance.onstart = () => {
+            console.log('Speech synthesis started');
+          };
+          
+          this.currentUtterance.onend = () => {
+            console.log('Speech synthesis completed successfully');
+            resolve();
+          };
+          
+          this.currentUtterance.onerror = (error) => {
+            console.error('Speech synthesis error:', error);
+            reject(new Error(`Speech synthesis failed: ${error.error}`));
+          };
+          
+          this.currentUtterance.onboundary = (event) => {
+            console.log('Speech boundary:', event.name, 'at', event.charIndex);
+          };
+          
+          // Start speaking
+          this.synth.speak(this.currentUtterance);
+          
+          // Fallback timeout
+          setTimeout(() => {
+            if (this.synth.speaking) {
+              console.log('Speech synthesis still running...');
+            }
+          }, 1000);
+          
+        }, 100);
         
       } catch (error) {
-        console.error('Speech synthesis failed:', error);
+        console.error('Speech synthesis setup failed:', error);
         reject(error);
       }
     });
   }
 
   stop(): void {
+    console.log('Stopping speech synthesis');
     this.synth.cancel();
     this.currentUtterance = null;
   }
@@ -136,7 +189,7 @@ export class FreeTTSService {
 }
 
 export const FREE_VOICE_OPTIONS = {
-  'Chrome Default': 'default',
+  'Browser Default': 'default',
   'Google US English': 'Google US English',
   'Microsoft David': 'Microsoft David Desktop - English (United States)',
   'Microsoft Zira': 'Microsoft Zira Desktop - English (United States)',
