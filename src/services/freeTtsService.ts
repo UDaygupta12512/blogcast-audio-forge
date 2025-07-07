@@ -16,6 +16,7 @@ export interface SubtitleSegment {
 export class FreeTTSService {
   private synth: SpeechSynthesis;
   private voices: SpeechSynthesisVoice[] = [];
+  private currentUtterance: SpeechSynthesisUtterance | null = null;
 
   constructor() {
     this.synth = window.speechSynthesis;
@@ -25,7 +26,6 @@ export class FreeTTSService {
   private loadVoices(): void {
     this.voices = this.synth.getVoices();
     
-    // If voices aren't loaded yet, wait for the event
     if (this.voices.length === 0) {
       this.synth.addEventListener('voiceschanged', () => {
         this.voices = this.synth.getVoices();
@@ -34,7 +34,6 @@ export class FreeTTSService {
   }
 
   async validateApiKey(): Promise<{ isValid: boolean; error?: string }> {
-    // No API key needed for Web Speech API
     if (!('speechSynthesis' in window)) {
       return {
         isValid: false,
@@ -76,58 +75,69 @@ export class FreeTTSService {
   async generateAudio(options: FreeTTSOptions): Promise<{ audioUrl: string; subtitles: SubtitleSegment[] }> {
     const { text, voice, rate = 1, pitch = 1, volume = 1 } = options;
     
+    console.log('Starting free TTS generation...');
+    
+    const subtitles = this.generateSubtitles(text, rate);
+    
+    // Create a simple audio URL indicator (not actual audio file)
+    const audioUrl = 'browser-speech-synthesis';
+    
+    console.log('Free TTS generation completed with subtitles');
+    return { audioUrl, subtitles };
+  }
+
+  speak(options: FreeTTSOptions): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        console.log('Starting free TTS generation...');
+        const { text, voice, rate = 1, pitch = 1, volume = 1 } = options;
         
-        const subtitles = this.generateSubtitles(text, rate);
+        // Stop any current speech
+        this.synth.cancel();
         
-        // Create speech utterance
-        const utterance = new SpeechSynthesisUtterance(text);
+        this.currentUtterance = new SpeechSynthesisUtterance(text);
         
         // Find the selected voice
         const selectedVoice = this.voices.find(v => v.name === voice) || this.voices[0];
         if (selectedVoice) {
-          utterance.voice = selectedVoice;
+          this.currentUtterance.voice = selectedVoice;
         }
         
-        utterance.rate = rate;
-        utterance.pitch = pitch;
-        utterance.volume = volume;
+        this.currentUtterance.rate = rate;
+        this.currentUtterance.pitch = pitch;
+        this.currentUtterance.volume = volume;
         
-        // We can't get actual audio file from Web Speech API easily
-        // So we'll create a simple audio URL placeholder
-        const audioUrl = `data:audio/wav;base64,${btoa('DUMMY_AUDIO_DATA')}`;
-        
-        utterance.onend = () => {
-          console.log('Free TTS generation completed');
-          resolve({ audioUrl, subtitles });
+        this.currentUtterance.onend = () => {
+          console.log('Speech synthesis completed');
+          resolve();
         };
         
-        utterance.onerror = (error) => {
-          console.error('Free TTS error:', error);
+        this.currentUtterance.onerror = (error) => {
+          console.error('Speech synthesis error:', error);
           reject(new Error('Speech synthesis failed'));
         };
         
-        // Start speaking
-        this.synth.speak(utterance);
-        
-        // Return immediately with subtitles for preview
-        setTimeout(() => {
-          resolve({ audioUrl, subtitles });
-        }, 1000);
+        this.synth.speak(this.currentUtterance);
         
       } catch (error) {
-        console.error('Free TTS generation failed:', error);
+        console.error('Speech synthesis failed:', error);
         reject(error);
       }
     });
   }
+
+  stop(): void {
+    this.synth.cancel();
+    this.currentUtterance = null;
+  }
+
+  isPlaying(): boolean {
+    return this.synth.speaking;
+  }
 }
 
 export const FREE_VOICE_OPTIONS = {
+  'Chrome Default': '',
   'Google US English': 'Google US English',
   'Microsoft David': 'Microsoft David Desktop - English (United States)',
   'Microsoft Zira': 'Microsoft Zira Desktop - English (United States)',
-  'Chrome Default': '',
 };

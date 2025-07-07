@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Play, Pause, Download, Share2, RotateCcw, Subtitles, SkipBack, SkipForward, Volume2 } from 'lucide-react';
+import { Play, Pause, Download, Share2, RotateCcw, Subtitles, SkipBack, SkipForward } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import AudioControls from './AudioControls';
 import { FreeTTSService } from '../services/freeTtsService';
@@ -23,7 +24,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [playbackRate, setPlaybackRate] = useState(1);
   const [audioQuality, setAudioQuality] = useState<'standard' | 'high'>('standard');
   const [showControls, setShowControls] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
   const ttsServiceRef = useRef<FreeTTSService | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -31,9 +31,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   // Initialize TTS service
   useEffect(() => {
     ttsServiceRef.current = new FreeTTSService();
-    setIsInitialized(true);
     
-    // Estimate duration from script
+    // Calculate duration from subtitles
     if (podcastData.subtitles && podcastData.subtitles.length > 0) {
       const lastSubtitle = podcastData.subtitles[podcastData.subtitles.length - 1];
       setDuration(lastSubtitle.end);
@@ -68,28 +67,26 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   }, [isPlaying, podcastData.subtitles, showSubtitles]);
 
   const togglePlayback = async () => {
-    if (!ttsServiceRef.current || !isInitialized) return;
+    if (!ttsServiceRef.current) return;
 
     if (isPlaying) {
-      // Stop speech synthesis
-      window.speechSynthesis.cancel();
+      ttsServiceRef.current.stop();
       setIsPlaying(false);
     } else {
-      // Start speech synthesis
       try {
         setIsPlaying(true);
-        await ttsServiceRef.current.generateAudio({
+        setCurrentTime(0);
+        
+        await ttsServiceRef.current.speak({
           text: podcastData.script,
           voice: podcastData.voice,
           rate: playbackRate,
           volume: isMuted ? 0 : volume / 100,
         });
         
-        // Reset when speech ends
-        setTimeout(() => {
-          setIsPlaying(false);
-          setCurrentTime(0);
-        }, duration * 1000);
+        // Speech ended naturally
+        setIsPlaying(false);
+        setCurrentTime(0);
         
       } catch (error) {
         console.error('Playback error:', error);
@@ -103,20 +100,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     }
   };
 
-  const skipTime = (seconds: number) => {
-    setCurrentTime(prev => Math.max(0, Math.min(duration, prev + seconds)));
-  };
-
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!duration) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const newTime = (clickX / rect.width) * duration;
-    
-    setCurrentTime(newTime);
-  };
-
   const formatTime = (seconds: number) => {
     if (isNaN(seconds)) return '0:00';
     const mins = Math.floor(seconds / 60);
@@ -125,7 +108,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   };
 
   const handleDownload = () => {
-    // Create a text file with the script since we can't create audio files easily
     const blob = new Blob([podcastData.script], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -159,9 +141,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h3 className="text-2xl font-semibold mb-2">Your Free Podcast with Subtitles is Ready!</h3>
+        <h3 className="text-2xl font-semibold mb-2">🎉 Your Free Podcast is Ready!</h3>
         <p className="text-muted-foreground">
-          Listen with browser speech synthesis and real-time subtitles
+          Click play to listen with real-time subtitles
         </p>
       </div>
 
@@ -170,10 +152,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           <div className="text-center">
             <h4 className="text-lg font-semibold text-purple-200">{podcastData.title}</h4>
             <p className="text-sm text-muted-foreground">
-              Duration: {formatTime(duration)} • Free TTS • Voice: {podcastData.voice || 'Default'}
+              Duration: ~{formatTime(duration)} • Free Browser TTS • Voice: {podcastData.voice || 'Default'}
             </p>
           </div>
 
+          {/* Simple Waveform Animation */}
           <div className="flex items-center justify-center">
             <div className="flex space-x-1">
               {[...Array(20)].map((_, i) => (
@@ -181,7 +164,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
                   key={i}
                   className={`w-1 rounded-full transition-all duration-300 ${
                     isPlaying 
-                      ? 'h-8 bg-gradient-to-t from-purple-500 to-blue-400 waveform-bar' 
+                      ? 'h-8 bg-gradient-to-t from-purple-500 to-blue-400' 
                       : 'h-4 bg-muted'
                   }`}
                   style={{ 
@@ -193,51 +176,29 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
             </div>
           </div>
 
+          {/* Progress Bar */}
           <div className="space-y-2">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>{formatTime(currentTime)}</span>
               <span>{playbackRate}x speed</span>
               <span>{formatTime(duration)}</span>
             </div>
-            <div 
-              className="w-full bg-muted rounded-full h-3 cursor-pointer hover:h-4 transition-all"
-              onClick={handleProgressClick}
-            >
+            <div className="w-full bg-muted rounded-full h-3">
               <div 
-                className="bg-gradient-to-r from-purple-500 to-blue-500 h-full rounded-full transition-all duration-300 relative"
+                className="bg-gradient-to-r from-purple-500 to-blue-500 h-full rounded-full transition-all duration-300"
                 style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
-              >
-                <div className="absolute right-0 top-1/2 transform translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg opacity-0 hover:opacity-100 transition-opacity" />
-              </div>
+              />
             </div>
           </div>
 
+          {/* Play Controls */}
           <div className="flex items-center justify-center space-x-3">
-            <Button
-              onClick={() => skipTime(-10)}
-              size="sm"
-              variant="outline"
-              className="rounded-full"
-            >
-              <SkipBack className="w-4 h-4" />
-            </Button>
-            
             <Button
               onClick={togglePlayback}
               size="lg"
               className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-full w-16 h-16"
-              disabled={!isInitialized}
             >
               {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
-            </Button>
-            
-            <Button
-              onClick={() => skipTime(10)}
-              size="sm"
-              variant="outline"
-              className="rounded-full"
-            >
-              <SkipForward className="w-4 h-4" />
             </Button>
 
             <Button
@@ -252,7 +213,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         </div>
       </Card>
 
-      {/* Enhanced Subtitles Display */}
+      {/* Live Subtitles Display */}
       {showSubtitles && (
         <Card className="p-6 bg-black/90 backdrop-blur-sm border-purple-500/30 min-h-[100px] flex items-center justify-center">
           {currentSubtitle ? (
@@ -267,12 +228,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         </Card>
       )}
 
-      {/* All Subtitles Preview */}
+      {/* Subtitle Timeline */}
       {showSubtitles && podcastData.subtitles && (
         <Card className="p-4 bg-muted/20">
           <h5 className="font-medium mb-3 flex items-center gap-2">
             <Subtitles className="w-4 h-4" />
-            Subtitle Timeline
+            Full Subtitle Timeline
           </h5>
           <div className="space-y-2 max-h-40 overflow-y-auto">
             {podcastData.subtitles.map((subtitle, index) => (
@@ -302,7 +263,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           onClick={() => setShowControls(!showControls)}
           variant="outline"
           size="sm"
-          className="mb-4"
         >
           {showControls ? 'Hide' : 'Show'} Controls
         </Button>
@@ -321,14 +281,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         />
       )}
 
-      {/* Script Preview */}
-      <Card className="p-4 bg-muted/20">
-        <h5 className="font-medium mb-2">Generated Script Preview</h5>
-        <p className="text-sm text-muted-foreground line-clamp-3">
-          {podcastData.script}
-        </p>
-      </Card>
-
+      {/* Action Buttons */}
       <div className="flex flex-wrap gap-3 justify-center">
         <Button onClick={handleDownload} variant="outline" className="flex items-center gap-2">
           <Download className="w-4 h-4" />
