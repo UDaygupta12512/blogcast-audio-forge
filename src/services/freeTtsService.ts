@@ -136,7 +136,7 @@ export class FreeTTSService {
 }
 
 export const FREE_VOICE_OPTIONS = {
-  'Chrome Default': '',
+  'Chrome Default': 'default',
   'Google US English': 'Google US English',
   'Microsoft David': 'Microsoft David Desktop - English (United States)',
   'Microsoft Zira': 'Microsoft Zira Desktop - English (United States)',
