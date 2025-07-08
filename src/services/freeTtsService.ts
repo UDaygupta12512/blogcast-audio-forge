@@ -18,6 +18,7 @@ export class FreeTTSService {
   private voices: SpeechSynthesisVoice[] = [];
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private isInitialized = false;
+  private voicesLoadTimeout: NodeJS.Timeout | null = null;
 
   constructor() {
     this.synth = window.speechSynthesis;
@@ -25,45 +26,57 @@ export class FreeTTSService {
   }
 
   private async initializeService(): Promise<void> {
-    // Ensure speech synthesis is ready
-    if (this.synth.speaking) {
-      this.synth.cancel();
-    }
+    // Cancel any ongoing speech first
+    this.synth.cancel();
+    
+    // Wait a bit to ensure clean state
+    await new Promise(resolve => setTimeout(resolve, 100));
     
     await this.loadVoices();
     this.isInitialized = true;
+    console.log('TTS Service initialized with', this.voices.length, 'voices');
   }
 
   private loadVoices(): Promise<void> {
     return new Promise((resolve) => {
-      const loadVoicesWithDelay = () => {
+      // Clear any existing timeout
+      if (this.voicesLoadTimeout) {
+        clearTimeout(this.voicesLoadTimeout);
+      }
+
+      const attemptLoadVoices = () => {
         this.voices = this.synth.getVoices();
-        console.log('Available voices loaded:', this.voices.length);
+        console.log('Voice loading attempt - found:', this.voices.length, 'voices');
         
         if (this.voices.length > 0) {
+          console.log('Available voices:', this.voices.map(v => `${v.name} (${v.lang})`));
           resolve();
+          return true;
         }
+        return false;
       };
 
       // Try loading voices immediately
-      loadVoicesWithDelay();
+      if (attemptLoadVoices()) return;
       
-      // If no voices, wait for the event
-      if (this.voices.length === 0) {
-        const handleVoicesChanged = () => {
-          loadVoicesWithDelay();
+      // Set up event listener for voice loading
+      const handleVoicesChanged = () => {
+        if (attemptLoadVoices()) {
           this.synth.removeEventListener('voiceschanged', handleVoicesChanged);
-          resolve();
-        };
-        
-        this.synth.addEventListener('voiceschanged', handleVoicesChanged);
-        
-        // Fallback timeout
-        setTimeout(() => {
-          this.synth.removeEventListener('voiceschanged', handleVoicesChanged);
-          resolve();
-        }, 2000);
-      }
+          if (this.voicesLoadTimeout) {
+            clearTimeout(this.voicesLoadTimeout);
+          }
+        }
+      };
+      
+      this.synth.addEventListener('voiceschanged', handleVoicesChanged);
+      
+      // Fallback timeout - resolve even if no voices loaded
+      this.voicesLoadTimeout = setTimeout(() => {
+        this.synth.removeEventListener('voiceschanged', handleVoicesChanged);
+        console.warn('Voice loading timeout - proceeding with', this.voices.length, 'voices');
+        resolve();
+      }, 3000);
     });
   }
 
@@ -80,12 +93,32 @@ export class FreeTTSService {
       await this.initializeService();
     }
     
-    // Test basic functionality
+    // Test basic functionality with a silent utterance
     try {
       const testUtterance = new SpeechSynthesisUtterance('test');
       testUtterance.volume = 0;
-      this.synth.speak(testUtterance);
-      this.synth.cancel();
+      testUtterance.rate = 1;
+      
+      // Create a promise to handle the test
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          this.synth.cancel();
+          reject(new Error('Test timeout'));
+        }, 2000);
+
+        testUtterance.onend = () => {
+          clearTimeout(timeout);
+          resolve();
+        };
+
+        testUtterance.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        };
+
+        this.synth.speak(testUtterance);
+      });
+      
       console.log('Speech synthesis validation successful');
     } catch (error) {
       console.warn('Speech synthesis validation failed:', error);
@@ -133,7 +166,7 @@ export class FreeTTSService {
       await this.initializeService();
     }
     
-    console.log('Generating audio with improved TTS service...');
+    console.log('Generating audio with TTS service...');
     
     const subtitles = this.generateSubtitles(text, rate);
     const audioUrl = 'browser-speech-synthesis';
@@ -151,7 +184,7 @@ export class FreeTTSService {
 
         const { text, voice, rate = 1, pitch = 1, volume = 0.8 } = options;
         
-        console.log('Starting enhanced speech synthesis:', { 
+        console.log('Starting speech synthesis with options:', { 
           voice, 
           rate, 
           pitch, 
@@ -159,100 +192,118 @@ export class FreeTTSService {
           textLength: text.length 
         });
         
-        // Ensure clean state
+        // Ensure completely clean state
         this.stop();
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Wait for any previous speech to stop
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
+        // Create new utterance
         this.currentUtterance = new SpeechSynthesisUtterance(text);
         
-        // Enhanced voice selection
+        // Enhanced voice selection with better matching
         if (voice && voice !== 'default') {
-          const selectedVoice = this.voices.find(v => 
-            v.name === voice || 
-            v.name.toLowerCase().includes(voice.toLowerCase()) ||
-            voice.toLowerCase().includes(v.name.toLowerCase())
-          );
+          const selectedVoice = this.voices.find(v => {
+            const voiceName = v.name.toLowerCase();
+            const targetVoice = voice.toLowerCase();
+            
+            return voiceName === targetVoice || 
+                   voiceName.includes(targetVoice) ||
+                   targetVoice.includes(voiceName) ||
+                   v.voiceURI.toLowerCase().includes(targetVoice);
+          });
           
           if (selectedVoice) {
-            console.log('Selected voice:', selectedVoice.name);
+            console.log('Selected voice:', selectedVoice.name, selectedVoice.voiceURI);
             this.currentUtterance.voice = selectedVoice;
           } else {
-            console.log('Voice not found, using default');
+            console.log('Voice not found, available voices:', this.voices.map(v => v.name));
           }
         }
         
-        // Apply speech parameters with validation
-        this.currentUtterance.rate = Math.max(0.3, Math.min(2.5, rate));
-        this.currentUtterance.pitch = Math.max(0.1, Math.min(2, pitch));
-        this.currentUtterance.volume = Math.max(0.1, Math.min(1, volume));
+        // Apply speech parameters with safer bounds
+        this.currentUtterance.rate = Math.max(0.5, Math.min(2.0, rate));
+        this.currentUtterance.pitch = Math.max(0.5, Math.min(2.0, pitch));
+        this.currentUtterance.volume = Math.max(0.1, Math.min(1.0, volume));
         
-        // Enhanced event handlers
+        console.log('Final utterance settings:', {
+          voice: this.currentUtterance.voice?.name || 'default',
+          rate: this.currentUtterance.rate,
+          pitch: this.currentUtterance.pitch,
+          volume: this.currentUtterance.volume
+        });
+        
+        // Set up event handlers
         this.currentUtterance.onstart = () => {
-          console.log('Enhanced speech synthesis started successfully');
+          console.log('✅ Speech synthesis started successfully');
         };
         
         this.currentUtterance.onend = () => {
-          console.log('Enhanced speech synthesis completed');
+          console.log('✅ Speech synthesis completed successfully');
           this.currentUtterance = null;
           resolve();
         };
         
         this.currentUtterance.onerror = (error) => {
-          console.error('Enhanced speech synthesis error:', error);
+          console.error('❌ Speech synthesis error:', error);
           this.currentUtterance = null;
           
-          if (error.error === 'interrupted') {
-            resolve(); // User stopped playback
+          if (error.error === 'interrupted' || error.error === 'canceled') {
+            console.log('Speech was interrupted by user');
+            resolve();
           } else {
             reject(new Error(`Speech synthesis failed: ${error.error}`));
           }
         };
         
         this.currentUtterance.onpause = () => {
-          console.log('Speech synthesis paused');
+          console.log('⏸️ Speech synthesis paused');
         };
         
         this.currentUtterance.onresume = () => {
-          console.log('Speech synthesis resumed');
+          console.log('▶️ Speech synthesis resumed');
+        };
+        
+        this.currentUtterance.onboundary = (event) => {
+          console.log('📍 Speech boundary:', event.name, 'at position', event.charIndex);
         };
         
         // Start speaking with retry mechanism
-        try {
-          this.synth.speak(this.currentUtterance);
-          
-          // Monitor speech progress
-          const progressMonitor = setInterval(() => {
-            if (!this.synth.speaking && this.currentUtterance) {
-              console.log('Speech synthesis monitoring: not speaking but utterance exists');
-              clearInterval(progressMonitor);
-            }
-          }, 1000);
-          
-          // Clear monitor when done
-          this.currentUtterance.onend = () => {
-            clearInterval(progressMonitor);
-            console.log('Enhanced speech synthesis completed');
-            this.currentUtterance = null;
-            resolve();
-          };
-          
-        } catch (speakError) {
-          console.error('Failed to start speech:', speakError);
-          reject(new Error('Failed to start speech synthesis'));
-        }
+        const startSpeaking = () => {
+          try {
+            console.log('🎤 Attempting to start speech...');
+            this.synth.speak(this.currentUtterance!);
+            
+            // Monitor if speech actually starts
+            setTimeout(() => {
+              if (this.currentUtterance && !this.synth.speaking && !this.synth.pending) {
+                console.warn('⚠️ Speech did not start, retrying...');
+                this.synth.cancel();
+                setTimeout(() => {
+                  if (this.currentUtterance) {
+                    this.synth.speak(this.currentUtterance);
+                  }
+                }, 100);
+              }
+            }, 500);
+            
+          } catch (speakError) {
+            console.error('❌ Failed to start speech:', speakError);
+            reject(new Error('Failed to start speech synthesis'));
+          }
+        };
+        
+        startSpeaking();
         
       } catch (error) {
-        console.error('Speech synthesis setup failed:', error);
+        console.error('❌ Speech synthesis setup failed:', error);
+        this.currentUtterance = null;
         reject(error);
       }
     });
   }
 
   stop(): void {
-    console.log('Stopping enhanced speech synthesis');
-    if (this.synth.speaking) {
+    console.log('🛑 Stopping speech synthesis');
+    if (this.synth.speaking || this.synth.pending) {
       this.synth.cancel();
     }
     this.currentUtterance = null;
@@ -262,7 +313,6 @@ export class FreeTTSService {
     return this.synth.speaking;
   }
 
-  // Get speech synthesis status
   getStatus(): { speaking: boolean; pending: boolean; paused: boolean } {
     return {
       speaking: this.synth.speaking,

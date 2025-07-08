@@ -24,6 +24,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [audioQuality, setAudioQuality] = useState<'standard' | 'high'>('standard');
   const [showControls, setShowControls] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const ttsServiceRef = useRef<FreeTTSService | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
@@ -32,15 +33,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   useEffect(() => {
     const initializeTTS = async () => {
       try {
+        console.log('🔄 Initializing TTS service...');
         ttsServiceRef.current = new FreeTTSService();
         
         // Calculate duration from subtitles
         if (podcastData.subtitles && podcastData.subtitles.length > 0) {
           const lastSubtitle = podcastData.subtitles[podcastData.subtitles.length - 1];
           setDuration(lastSubtitle.end);
+          console.log('📊 Calculated duration:', lastSubtitle.end, 'seconds');
         }
+        
+        setSpeechError(null);
       } catch (error) {
-        console.error('Failed to initialize TTS service:', error);
+        console.error('❌ Failed to initialize TTS service:', error);
+        setSpeechError('Failed to initialize speech service');
         toast({
           title: "Audio Service Error",
           description: "Failed to initialize speech synthesis. Please refresh the page.",
@@ -50,6 +56,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     };
 
     initializeTTS();
+    
+    // Cleanup on unmount
+    return () => {
+      if (ttsServiceRef.current) {
+        ttsServiceRef.current.stop();
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
   }, [podcastData.subtitles, toast]);
 
   // Enhanced subtitle timing with smooth animations
@@ -87,32 +103,38 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     if (!ttsServiceRef.current) {
       toast({
         title: "Audio Service Unavailable",
-        description: "Speech synthesis service not ready. Please try again in a moment.",
+        description: "Speech synthesis service not ready. Please refresh the page.",
         variant: "destructive"
       });
       return;
     }
 
     if (isPlaying) {
-      console.log('Stopping enhanced speech synthesis');
+      console.log('🛑 User requested stop');
       ttsServiceRef.current.stop();
       setIsPlaying(false);
       setCurrentTime(0);
       setIsLoading(false);
+      setSpeechError(null);
     } else {
       try {
         setIsLoading(true);
-        console.log('Starting enhanced speech with improved settings:', {
+        setSpeechError(null);
+        
+        const effectiveVolume = isMuted ? 0 : Math.max(0.1, volume / 100);
+        
+        console.log('🎤 Starting speech with settings:', {
           voice: podcastData.voice,
           rate: playbackRate,
-          volume: isMuted ? 0 : volume / 100,
+          volume: effectiveVolume,
           textLength: podcastData.script.length
         });
         
         setIsPlaying(true);
         setCurrentTime(0);
         
-        const effectiveVolume = isMuted ? 0 : Math.max(0.2, volume / 100);
+        // Add a small delay to ensure UI updates
+        await new Promise(resolve => setTimeout(resolve, 200));
         
         await ttsServiceRef.current.speak({
           text: podcastData.script,
@@ -122,7 +144,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           volume: effectiveVolume,
         });
         
-        console.log('Enhanced speech synthesis completed successfully');
+        console.log('✅ Speech synthesis completed successfully');
         setIsPlaying(false);
         setCurrentTime(0);
         
@@ -132,13 +154,15 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         });
         
       } catch (error) {
-        console.error('Enhanced playback error:', error);
+        console.error('❌ Playback error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        setSpeechError(errorMessage);
         setIsPlaying(false);
         setCurrentTime(0);
         
         toast({
           title: "Playback Error",
-          description: "Audio playback failed. Please check your browser settings and try again.",
+          description: `Audio playback failed: ${errorMessage}. Please check your browser settings and try again.`,
           variant: "destructive"
         });
       } finally {
@@ -202,6 +226,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         <p className="text-muted-foreground text-lg">
           Professional AI-generated podcast with real-time subtitles
         </p>
+        
+        {speechError && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+            <p className="text-red-400 text-sm">⚠️ {speechError}</p>
+          </div>
+        )}
       </div>
 
       <Card className="p-8 bg-gradient-to-br from-purple-900/30 via-blue-900/20 to-indigo-900/30 border-purple-500/30 relative overflow-hidden">
@@ -258,6 +288,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
               <span>{formatTime(currentTime)}</span>
               <span className="flex items-center gap-2">
                 {isLoading && <div className="w-2 h-2 bg-blue-400 rounded-full animate-ping"></div>}
+                {isPlaying && <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>}
                 {playbackRate}x speed
               </span>
               <span>{formatTime(duration)}</span>
