@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,6 +15,7 @@ interface AudioPlayerProps {
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showSubtitles, setShowSubtitles] = useState(true);
@@ -27,6 +29,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [speechError, setSpeechError] = useState<string | null>(null);
   const ttsServiceRef = useRef<FreeTTSService | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const startTimeRef = useRef<number>(0);
+  const pausedAtRef = useRef<number>(0);
   const { toast } = useToast();
 
   // Initialize TTS service with better error handling
@@ -68,24 +72,26 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     };
   }, [podcastData.subtitles, toast]);
 
-  // Enhanced subtitle timing with smooth animations
+  // Enhanced timer with proper pause/resume functionality
   useEffect(() => {
-    if (isPlaying && podcastData.subtitles && showSubtitles) {
+    if (isPlaying && !isPaused) {
+      startTimeRef.current = Date.now() - (currentTime * 1000);
+      
       intervalRef.current = setInterval(() => {
-        setCurrentTime(prev => {
-          const newTime = prev + 0.1;
-          
-          const current = podcastData.subtitles?.find(
-            subtitle => newTime >= subtitle.start && newTime <= subtitle.end
+        const elapsed = (Date.now() - startTimeRef.current) / 1000;
+        setCurrentTime(elapsed);
+        
+        // Update subtitles
+        if (podcastData.subtitles && showSubtitles) {
+          const current = podcastData.subtitles.find(
+            subtitle => elapsed >= subtitle.start && elapsed <= subtitle.end
           );
           
           const newSubtitle = current?.text || '';
           if (newSubtitle !== currentSubtitle) {
             setCurrentSubtitle(newSubtitle);
           }
-          
-          return newTime;
-        });
+        }
       }, 100);
     } else if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -97,7 +103,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPlaying, podcastData.subtitles, showSubtitles, currentSubtitle]);
+  }, [isPlaying, isPaused, currentTime, podcastData.subtitles, showSubtitles, currentSubtitle]);
 
   const togglePlayback = async () => {
     if (!ttsServiceRef.current) {
@@ -110,10 +116,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     }
 
     if (isPlaying) {
-      console.log('🛑 User requested stop');
+      console.log('⏸️ User requested pause');
       ttsServiceRef.current.stop();
       setIsPlaying(false);
-      setCurrentTime(0);
+      setIsPaused(true);
+      pausedAtRef.current = currentTime;
       setIsLoading(false);
       setSpeechError(null);
     } else {
@@ -127,11 +134,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           voice: podcastData.voice,
           rate: playbackRate,
           volume: effectiveVolume,
-          textLength: podcastData.script.length
+          textLength: podcastData.script.length,
+          resumeFrom: isPaused ? pausedAtRef.current : 0
         });
         
         setIsPlaying(true);
-        setCurrentTime(0);
+        setIsPaused(false);
+        
+        // If resuming, don't reset current time
+        if (!isPaused) {
+          setCurrentTime(0);
+          startTimeRef.current = Date.now();
+        } else {
+          startTimeRef.current = Date.now() - (pausedAtRef.current * 1000);
+        }
         
         // Add a small delay to ensure UI updates
         await new Promise(resolve => setTimeout(resolve, 200));
@@ -146,6 +162,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         
         console.log('✅ Speech synthesis completed successfully');
         setIsPlaying(false);
+        setIsPaused(false);
         setCurrentTime(0);
         
         toast({
@@ -158,6 +175,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         setSpeechError(errorMessage);
         setIsPlaying(false);
+        setIsPaused(false);
         setCurrentTime(0);
         
         toast({
@@ -267,12 +285,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
                 <div
                   key={i}
                   className={`w-1 rounded-full transition-all duration-500 ${
-                    isPlaying 
+                    isPlaying && !isPaused
                       ? 'bg-gradient-to-t from-purple-500 via-pink-400 to-blue-400 waveform-bar' 
                       : 'bg-muted/40'
                   }`}
                   style={{ 
-                    height: isPlaying 
+                    height: isPlaying && !isPaused
                       ? `${Math.random() * 40 + 20}px` 
                       : '12px',
                     animationDelay: `${i * 0.1}s`
@@ -288,7 +306,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
               <span>{formatTime(currentTime)}</span>
               <span className="flex items-center gap-2">
                 {isLoading && <div className="w-2 h-2 bg-blue-400 rounded-full animate-ping"></div>}
-                {isPlaying && <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>}
+                {isPlaying && !isPaused && <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>}
+                {isPaused && <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>}
                 {playbackRate}x speed
               </span>
               <span>{formatTime(duration)}</span>
@@ -297,13 +316,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
             <div className="relative w-full bg-muted/30 rounded-full h-4 overflow-hidden">
               <div 
                 className={`h-full rounded-full transition-all duration-300 ${
-                  isPlaying 
+                  isPlaying || isPaused
                     ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 shadow-lg shadow-purple-500/50' 
                     : 'bg-gradient-to-r from-purple-600/50 to-blue-600/50'
                 }`}
                 style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
               />
-              {isPlaying && (
+              {(isPlaying || isPaused) && (
                 <div 
                   className="absolute top-0 w-1 h-full bg-white rounded-full shadow-lg"
                   style={{ left: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
@@ -312,21 +331,21 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
             </div>
           </div>
 
-          {/* Enhanced Play Controls */}
+          {/* Enhanced Play/Pause Controls */}
           <div className="flex items-center justify-center space-x-4">
             <Button
               onClick={togglePlayback}
               size="lg"
               disabled={isLoading}
               className={`rounded-full w-20 h-20 text-white border-2 transition-all duration-300 ${
-                isPlaying 
+                isPlaying && !isPaused
                   ? 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 border-red-400/50 shadow-lg shadow-red-500/30' 
                   : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-purple-400/50 shadow-lg shadow-purple-500/30'
               } ${isLoading ? 'animate-pulse' : 'hover:scale-105'}`}
             >
               {isLoading ? (
                 <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : isPlaying ? (
+              ) : (isPlaying && !isPaused) ? (
                 <Pause className="w-8 h-8" />
               ) : (
                 <Play className="w-8 h-8 ml-1" />
