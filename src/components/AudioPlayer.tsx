@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Play, Pause, Download, Share2, RotateCcw, Subtitles } from 'lucide-react';
+import { Play, Pause, Download, Share2, RotateCcw, Subtitles, Volume2, VolumeX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import AudioControls from './AudioControls';
 import { FreeTTSService } from '../services/freeTtsService';
@@ -18,27 +18,41 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [duration, setDuration] = useState(0);
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
-  const [volume, setVolume] = useState(75);
+  const [volume, setVolume] = useState(80);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [audioQuality, setAudioQuality] = useState<'standard' | 'high'>('standard');
   const [showControls, setShowControls] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const ttsServiceRef = useRef<FreeTTSService | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  // Initialize TTS service
+  // Initialize TTS service with better error handling
   useEffect(() => {
-    ttsServiceRef.current = new FreeTTSService();
-    
-    // Calculate duration from subtitles
-    if (podcastData.subtitles && podcastData.subtitles.length > 0) {
-      const lastSubtitle = podcastData.subtitles[podcastData.subtitles.length - 1];
-      setDuration(lastSubtitle.end);
-    }
-  }, [podcastData.subtitles]);
+    const initializeTTS = async () => {
+      try {
+        ttsServiceRef.current = new FreeTTSService();
+        
+        // Calculate duration from subtitles
+        if (podcastData.subtitles && podcastData.subtitles.length > 0) {
+          const lastSubtitle = podcastData.subtitles[podcastData.subtitles.length - 1];
+          setDuration(lastSubtitle.end);
+        }
+      } catch (error) {
+        console.error('Failed to initialize TTS service:', error);
+        toast({
+          title: "Audio Service Error",
+          description: "Failed to initialize speech synthesis. Please refresh the page.",
+          variant: "destructive"
+        });
+      }
+    };
 
-  // Handle subtitle timing during playback
+    initializeTTS();
+  }, [podcastData.subtitles, toast]);
+
+  // Enhanced subtitle timing with smooth animations
   useEffect(() => {
     if (isPlaying && podcastData.subtitles && showSubtitles) {
       intervalRef.current = setInterval(() => {
@@ -48,7 +62,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           const current = podcastData.subtitles?.find(
             subtitle => newTime >= subtitle.start && newTime <= subtitle.end
           );
-          setCurrentSubtitle(current?.text || '');
+          
+          const newSubtitle = current?.text || '';
+          if (newSubtitle !== currentSubtitle) {
+            setCurrentSubtitle(newSubtitle);
+          }
           
           return newTime;
         });
@@ -63,27 +81,28 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isPlaying, podcastData.subtitles, showSubtitles]);
+  }, [isPlaying, podcastData.subtitles, showSubtitles, currentSubtitle]);
 
   const togglePlayback = async () => {
     if (!ttsServiceRef.current) {
-      console.error('TTS service not initialized');
       toast({
-        title: "Audio Error",
-        description: "Speech synthesis service not available. Please refresh the page.",
+        title: "Audio Service Unavailable",
+        description: "Speech synthesis service not ready. Please try again in a moment.",
         variant: "destructive"
       });
       return;
     }
 
     if (isPlaying) {
-      console.log('Stopping speech synthesis');
+      console.log('Stopping enhanced speech synthesis');
       ttsServiceRef.current.stop();
       setIsPlaying(false);
       setCurrentTime(0);
+      setIsLoading(false);
     } else {
       try {
-        console.log('Starting speech synthesis with settings:', {
+        setIsLoading(true);
+        console.log('Starting enhanced speech with improved settings:', {
           voice: podcastData.voice,
           rate: playbackRate,
           volume: isMuted ? 0 : volume / 100,
@@ -93,8 +112,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         setIsPlaying(true);
         setCurrentTime(0);
         
-        // Ensure volume is set correctly
-        const effectiveVolume = isMuted ? 0 : Math.max(0.1, volume / 100);
+        const effectiveVolume = isMuted ? 0 : Math.max(0.2, volume / 100);
         
         await ttsServiceRef.current.speak({
           text: podcastData.script,
@@ -104,33 +122,30 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           volume: effectiveVolume,
         });
         
-        // Speech ended naturally
-        console.log('Speech synthesis completed');
+        console.log('Enhanced speech synthesis completed successfully');
         setIsPlaying(false);
         setCurrentTime(0);
         
+        toast({
+          title: "Podcast Completed! 🎉",
+          description: "Thanks for listening to your AI-generated podcast.",
+        });
+        
       } catch (error) {
-        console.error('Playback error:', error);
+        console.error('Enhanced playback error:', error);
         setIsPlaying(false);
         setCurrentTime(0);
+        
         toast({
           title: "Playback Error",
-          description: "Failed to play audio. Please try again or check your browser's audio settings.",
+          description: "Audio playback failed. Please check your browser settings and try again.",
           variant: "destructive"
         });
+      } finally {
+        setIsLoading(false);
       }
     }
   };
-
-  // Update volume in real-time
-  useEffect(() => {
-    if (ttsServiceRef.current && isPlaying) {
-      const effectiveVolume = isMuted ? 0 : volume / 100;
-      console.log('Updating volume to:', effectiveVolume);
-      // Note: Web Speech API doesn't support real-time volume changes during playback
-      // This will apply to the next playback
-    }
-  }, [volume, isMuted, isPlaying]);
 
   const formatTime = (seconds: number) => {
     if (isNaN(seconds)) return '0:00';
@@ -144,151 +159,218 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${podcastData.title}_script.txt`;
+    link.download = `${podcastData.title.replace(/[^a-z0-9]/gi, '_')}_podcast_script.txt`;
     link.click();
     URL.revokeObjectURL(url);
     
     toast({
-      title: "Script Downloaded",
-      description: "Your podcast script has been downloaded as a text file.",
+      title: "Script Downloaded! 📄",
+      description: "Your podcast script has been saved to your downloads.",
     });
   };
 
   const handleShare = () => {
     navigator.clipboard.writeText(podcastData.script);
     toast({
-      title: "Script Copied",
-      description: "Podcast script has been copied to your clipboard.",
+      title: "Script Copied! 📋",
+      description: "Podcast script copied to clipboard - ready to share!",
     });
   };
 
   if (!podcastData.audioUrl) {
     return (
-      <div className="text-center py-8">
-        <p className="text-muted-foreground">Audio is being generated...</p>
+      <div className="text-center py-12">
+        <div className="animate-pulse space-y-4">
+          <div className="w-16 h-16 bg-purple-600/20 rounded-full mx-auto animate-ping"></div>
+          <p className="text-muted-foreground">Preparing your podcast audio...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-2xl font-semibold mb-2">🎉 Your Free Podcast is Ready!</h3>
-        <p className="text-muted-foreground">
-          Click play to listen with real-time subtitles
-        </p>
-        <p className="text-sm text-yellow-600 mt-2">
-          💡 If audio is not audible, check your browser's audio settings and ensure volume is up
+    <div className="space-y-8">
+      <div className="text-center space-y-4">
+        <div className="relative">
+          <h3 className="text-3xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
+            🎉 Your Podcast is Ready!
+          </h3>
+          {isPlaying && (
+            <div className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>
+          )}
+        </div>
+        <p className="text-muted-foreground text-lg">
+          Professional AI-generated podcast with real-time subtitles
         </p>
       </div>
 
-      <Card className="p-6 bg-gradient-to-br from-purple-900/20 to-blue-900/20 border-purple-500/20">
-        <div className="space-y-4">
-          <div className="text-center">
-            <h4 className="text-lg font-semibold text-purple-200">{podcastData.title}</h4>
-            <p className="text-sm text-muted-foreground">
-              Duration: ~{formatTime(duration)} • Volume: {isMuted ? '0' : volume}% • Speed: {playbackRate}x
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
+      <Card className="p-8 bg-gradient-to-br from-purple-900/30 via-blue-900/20 to-indigo-900/30 border-purple-500/30 relative overflow-hidden">
+        {/* Background Animation */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-0 left-1/4 w-2 h-2 bg-purple-400 rounded-full animate-float"></div>
+          <div className="absolute top-1/3 right-1/4 w-1 h-1 bg-blue-400 rounded-full animate-float" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute bottom-1/4 left-1/3 w-1.5 h-1.5 bg-pink-400 rounded-full animate-float" style={{ animationDelay: '4s' }}></div>
+        </div>
+
+        <div className="relative space-y-6">
+          <div className="text-center space-y-2">
+            <h4 className="text-xl font-bold text-purple-200">{podcastData.title}</h4>
+            <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+              <span>Duration: ~{formatTime(duration)}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1">
+                {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
+                {isMuted ? '0' : volume}%
+              </span>
+              <span>•</span>
+              <span>Speed: {playbackRate}x</span>
+            </div>
+            <p className="text-xs text-purple-300/70">
               Voice: {podcastData.voice || 'Browser Default'}
             </p>
           </div>
 
-          {/* Simple Waveform Animation */}
-          <div className="flex items-center justify-center">
-            <div className="flex space-x-1">
-              {[...Array(20)].map((_, i) => (
+          {/* Enhanced Waveform Animation */}
+          <div className="flex items-center justify-center py-4">
+            <div className="flex space-x-2">
+              {[...Array(25)].map((_, i) => (
                 <div
                   key={i}
-                  className={`w-1 rounded-full transition-all duration-300 ${
+                  className={`w-1 rounded-full transition-all duration-500 ${
                     isPlaying 
-                      ? 'h-8 bg-gradient-to-t from-purple-500 to-blue-400' 
-                      : 'h-4 bg-muted'
+                      ? 'bg-gradient-to-t from-purple-500 via-pink-400 to-blue-400 waveform-bar' 
+                      : 'bg-muted/40'
                   }`}
                   style={{ 
-                    animationDelay: `${i * 0.05}s`,
-                    height: isPlaying ? `${Math.random() * 32 + 16}px` : '16px'
+                    height: isPlaying 
+                      ? `${Math.random() * 40 + 20}px` 
+                      : '12px',
+                    animationDelay: `${i * 0.1}s`
                   }}
                 />
               ))}
             </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-2">
+          {/* Progress Bar with Glow Effect */}
+          <div className="space-y-3">
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>{formatTime(currentTime)}</span>
-              <span>{playbackRate}x speed</span>
+              <span className="flex items-center gap-2">
+                {isLoading && <div className="w-2 h-2 bg-blue-400 rounded-full animate-ping"></div>}
+                {playbackRate}x speed
+              </span>
               <span>{formatTime(duration)}</span>
             </div>
-            <div className="w-full bg-muted rounded-full h-3">
+            
+            <div className="relative w-full bg-muted/30 rounded-full h-4 overflow-hidden">
               <div 
-                className="bg-gradient-to-r from-purple-500 to-blue-500 h-full rounded-full transition-all duration-300"
+                className={`h-full rounded-full transition-all duration-300 ${
+                  isPlaying 
+                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-blue-500 shadow-lg shadow-purple-500/50' 
+                    : 'bg-gradient-to-r from-purple-600/50 to-blue-600/50'
+                }`}
                 style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
               />
+              {isPlaying && (
+                <div 
+                  className="absolute top-0 w-1 h-full bg-white rounded-full shadow-lg"
+                  style={{ left: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                />
+              )}
             </div>
           </div>
 
-          {/* Play Controls */}
-          <div className="flex items-center justify-center space-x-3">
+          {/* Enhanced Play Controls */}
+          <div className="flex items-center justify-center space-x-4">
             <Button
               onClick={togglePlayback}
               size="lg"
-              className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-full w-16 h-16"
+              disabled={isLoading}
+              className={`rounded-full w-20 h-20 text-white border-2 transition-all duration-300 ${
+                isPlaying 
+                  ? 'bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 border-red-400/50 shadow-lg shadow-red-500/30' 
+                  : 'bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 border-purple-400/50 shadow-lg shadow-purple-500/30'
+              } ${isLoading ? 'animate-pulse' : 'hover:scale-105'}`}
             >
-              {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6" />}
+              {isLoading ? (
+                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : isPlaying ? (
+                <Pause className="w-8 h-8" />
+              ) : (
+                <Play className="w-8 h-8 ml-1" />
+              )}
             </Button>
 
             <Button
               onClick={() => setShowSubtitles(!showSubtitles)}
               variant="outline"
               size="sm"
-              className={showSubtitles ? 'bg-purple-600/20' : ''}
+              className={`border-purple-500/30 hover:bg-purple-600/20 transition-all duration-200 ${
+                showSubtitles ? 'bg-purple-600/30 text-purple-200' : ''
+              }`}
             >
               <Subtitles className="w-4 h-4" />
+            </Button>
+
+            <Button
+              onClick={() => setIsMuted(!isMuted)}
+              variant="outline"
+              size="sm"
+              className="border-blue-500/30 hover:bg-blue-600/20 transition-all duration-200"
+            >
+              {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </Button>
           </div>
         </div>
       </Card>
 
-      {/* Live Subtitles Display */}
+      {/* Enhanced Live Subtitles Display */}
       {showSubtitles && (
-        <Card className="p-6 bg-black/90 backdrop-blur-sm border-purple-500/30 min-h-[100px] flex items-center justify-center">
-          {currentSubtitle ? (
-            <p className="text-center text-white text-xl leading-relaxed font-medium">
-              {currentSubtitle}
-            </p>
-          ) : (
-            <p className="text-center text-gray-400 text-lg">
-              {isPlaying ? 'Listen for subtitles...' : 'Press play to see subtitles here'}
-            </p>
-          )}
+        <Card className="p-8 bg-black/95 backdrop-blur-sm border-purple-500/40 min-h-[120px] flex items-center justify-center relative overflow-hidden">
+          {/* Subtitle Background Effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-900/10 via-blue-900/10 to-indigo-900/10"></div>
+          
+          <div className="relative text-center">
+            {currentSubtitle ? (
+              <p className="text-white text-2xl leading-relaxed font-medium animate-fade-in max-w-4xl">
+                {currentSubtitle}
+              </p>
+            ) : (
+              <p className="text-gray-400 text-xl animate-pulse">
+                {isPlaying ? 'Listen for subtitles...' : 'Press play to see subtitles here'}
+              </p>
+            )}
+          </div>
         </Card>
       )}
 
       {/* Subtitle Timeline */}
       {showSubtitles && podcastData.subtitles && (
-        <Card className="p-4 bg-muted/20">
-          <h5 className="font-medium mb-3 flex items-center gap-2">
+        <Card className="p-6 bg-muted/10 backdrop-blur-sm border-muted/20">
+          <h5 className="font-medium mb-4 flex items-center gap-2 text-purple-200">
             <Subtitles className="w-4 h-4" />
             Full Subtitle Timeline
           </h5>
-          <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar">
             {podcastData.subtitles.map((subtitle, index) => (
               <div
                 key={index}
-                className={`p-2 rounded text-sm transition-colors ${
+                className={`p-3 rounded-lg text-sm transition-all duration-300 ${
                   currentTime >= subtitle.start && currentTime <= subtitle.end
-                    ? 'bg-purple-600/20 border border-purple-500/30'
-                    : 'bg-muted/10'
+                    ? 'bg-gradient-to-r from-purple-600/30 to-blue-600/30 border border-purple-500/50 shadow-lg transform scale-[1.02]'
+                    : 'bg-muted/10 hover:bg-muted/20'
                 }`}
               >
-                <div className="flex justify-between items-start gap-2">
-                  <span className="text-xs text-muted-foreground">
+                <div className="flex justify-between items-start gap-2 mb-2">
+                  <span className="text-xs text-muted-foreground font-mono">
                     {formatTime(subtitle.start)} - {formatTime(subtitle.end)}
                   </span>
+                  {currentTime >= subtitle.start && currentTime <= subtitle.end && (
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  )}
                 </div>
-                <p className="mt-1">{subtitle.text}</p>
+                <p className="leading-relaxed">{subtitle.text}</p>
               </div>
             ))}
           </div>
@@ -296,40 +378,55 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
       )}
 
       {/* Enhanced Audio Controls */}
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         <Button
           onClick={() => setShowControls(!showControls)}
           variant="outline"
           size="sm"
+          className="border-purple-500/30 hover:bg-purple-600/20 transition-all duration-200"
         >
           {showControls ? 'Hide' : 'Show'} Audio Controls
         </Button>
       </div>
 
       {showControls && (
-        <AudioControls
-          volume={volume}
-          onVolumeChange={setVolume}
-          playbackRate={playbackRate}
-          onPlaybackRateChange={setPlaybackRate}
-          isMuted={isMuted}
-          onMuteToggle={() => setIsMuted(!isMuted)}
-          audioQuality={audioQuality}
-          onQualityChange={setAudioQuality}
-        />
+        <div className="animate-fade-in">
+          <AudioControls
+            volume={volume}
+            onVolumeChange={setVolume}
+            playbackRate={playbackRate}
+            onPlaybackRateChange={setPlaybackRate}
+            isMuted={isMuted}
+            onMuteToggle={() => setIsMuted(!isMuted)}
+            audioQuality={audioQuality}
+            onQualityChange={setAudioQuality}
+          />
+        </div>
       )}
 
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-3 justify-center">
-        <Button onClick={handleDownload} variant="outline" className="flex items-center gap-2">
+      {/* Enhanced Action Buttons */}
+      <div className="flex flex-wrap gap-4 justify-center">
+        <Button 
+          onClick={handleDownload} 
+          variant="outline" 
+          className="flex items-center gap-2 hover:bg-green-600/20 border-green-500/30 transition-all duration-200 hover:scale-105"
+        >
           <Download className="w-4 h-4" />
           Download Script
         </Button>
-        <Button onClick={handleShare} variant="outline" className="flex items-center gap-2">
+        <Button 
+          onClick={handleShare} 
+          variant="outline" 
+          className="flex items-center gap-2 hover:bg-blue-600/20 border-blue-500/30 transition-all duration-200 hover:scale-105"
+        >
           <Share2 className="w-4 h-4" />
           Share Script
         </Button>
-        <Button onClick={onReset} variant="outline" className="flex items-center gap-2">
+        <Button 
+          onClick={onReset} 
+          variant="outline" 
+          className="flex items-center gap-2 hover:bg-purple-600/20 border-purple-500/30 transition-all duration-200 hover:scale-105"
+        >
           <RotateCcw className="w-4 h-4" />
           Create Another
         </Button>
