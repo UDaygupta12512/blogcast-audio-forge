@@ -19,6 +19,7 @@ export class FreeTTSService {
   private currentUtterance: SpeechSynthesisUtterance | null = null;
   private isInitialized = false;
   private voicesLoadTimeout: NodeJS.Timeout | null = null;
+  private activeUtterances: SpeechSynthesisUtterance[] = [];
 
   constructor() {
     this.synth = window.speechSynthesis;
@@ -135,6 +136,11 @@ export class FreeTTSService {
     return this.voices.filter(voice => voice.lang.startsWith('en'));
   }
 
+  // Method to access current active utterances for volume control
+  getActiveUtterances(): SpeechSynthesisUtterance[] {
+    return this.activeUtterances;
+  }
+
   private generateSubtitles(text: string, rate: number = 1): SubtitleSegment[] {
     const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const subtitles: SubtitleSegment[] = [];
@@ -196,8 +202,14 @@ export class FreeTTSService {
         this.stop();
         await new Promise(resolve => setTimeout(resolve, 300));
         
+        // Clear previous utterances array
+        this.activeUtterances = [];
+        
         // Create new utterance
         this.currentUtterance = new SpeechSynthesisUtterance(text);
+        
+        // Add to active utterances array
+        this.activeUtterances.push(this.currentUtterance);
         
         // Enhanced voice selection with better matching
         if (voice && voice !== 'default') {
@@ -239,12 +251,16 @@ export class FreeTTSService {
         this.currentUtterance.onend = () => {
           console.log('✅ Speech synthesis completed successfully');
           this.currentUtterance = null;
+          // Remove from active utterances
+          this.activeUtterances = [];
           resolve();
         };
         
         this.currentUtterance.onerror = (error) => {
           console.error('❌ Speech synthesis error:', error);
           this.currentUtterance = null;
+          // Clear active utterances on error
+          this.activeUtterances = [];
           
           if (error.error === 'interrupted' || error.error === 'canceled') {
             console.log('Speech was interrupted by user');
@@ -296,6 +312,7 @@ export class FreeTTSService {
       } catch (error) {
         console.error('❌ Speech synthesis setup failed:', error);
         this.currentUtterance = null;
+        this.activeUtterances = [];
         reject(error);
       }
     });
@@ -307,6 +324,7 @@ export class FreeTTSService {
       this.synth.cancel();
     }
     this.currentUtterance = null;
+    this.activeUtterances = [];
   }
 
   isPlaying(): boolean {

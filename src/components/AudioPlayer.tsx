@@ -115,7 +115,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
       return;
     }
 
-    if (isPlaying) {
+    if (isPlaying && !isPaused) {
       console.log('⏸️ User requested pause');
       ttsServiceRef.current.stop();
       setIsPlaying(false);
@@ -128,6 +128,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         setIsLoading(true);
         setSpeechError(null);
         
+        // Apply actual volume setting based on mute state
         const effectiveVolume = isMuted ? 0 : Math.max(0.1, volume / 100);
         
         console.log('🎤 Starting speech with settings:', {
@@ -135,7 +136,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           rate: playbackRate,
           volume: effectiveVolume,
           textLength: podcastData.script.length,
-          resumeFrom: isPaused ? pausedAtRef.current : 0
+          resumeFrom: isPaused ? pausedAtRef.current : 0,
+          isMuted: isMuted
         });
         
         setIsPlaying(true);
@@ -185,6 +187,68 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         });
       } finally {
         setIsLoading(false);
+      }
+    }
+  };
+
+  // Handle mute toggle with immediate effect
+  const handleMuteToggle = () => {
+    const newMuteState = !isMuted;
+    setIsMuted(newMuteState);
+    
+    // If currently playing, update the active speech volume
+    if (isPlaying && ttsServiceRef.current) {
+      try {
+        // Stop and restart with new volume setting
+        const currentPosition = currentTime;
+        ttsServiceRef.current.stop();
+        
+        // Small delay to ensure proper stop
+        setTimeout(async () => {
+          if (ttsServiceRef.current) {
+            const effectiveVolume = newMuteState ? 0 : Math.max(0.1, volume / 100);
+            pausedAtRef.current = currentPosition;
+            startTimeRef.current = Date.now() - (currentPosition * 1000);
+            
+            // Resume playback with new volume
+            await ttsServiceRef.current.speak({
+              text: podcastData.script,
+              voice: podcastData.voice === 'default' ? undefined : podcastData.voice,
+              rate: playbackRate,
+              pitch: 1,
+              volume: effectiveVolume,
+            });
+          }
+        }, 100);
+      } catch (error) {
+        console.error('Error updating volume during playback:', error);
+      }
+    }
+    
+    console.log(`🔊 Mute toggled: ${newMuteState ? 'Muted' : 'Unmuted'}, Volume: ${volume}%`);
+  };
+
+  // Update volume with immediate effect
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    
+    // If muted and increasing volume, unmute
+    if (isMuted && newVolume > 0) {
+      setIsMuted(false);
+    }
+    
+    // If currently playing, update the active speech volume
+    if (isPlaying && ttsServiceRef.current && !isMuted) {
+      try {
+        // Apply new volume in real-time (if supported by browser)
+        const utterances = ttsServiceRef.current.getActiveUtterances();
+        if (utterances && utterances.length > 0) {
+          utterances.forEach(utterance => {
+            utterance.volume = Math.max(0.1, newVolume / 100);
+          });
+        }
+      } catch (error) {
+        console.error('Error updating volume during playback:', error);
       }
     }
   };
@@ -364,10 +428,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
             </Button>
 
             <Button
-              onClick={() => setIsMuted(!isMuted)}
+              onClick={handleMuteToggle}
               variant="outline"
               size="sm"
-              className="border-blue-500/30 hover:bg-blue-600/20 transition-all duration-200"
+              className={`border-blue-500/30 hover:bg-blue-600/20 transition-all duration-200 ${
+                isMuted ? 'bg-red-600/30 text-red-200' : ''
+              }`}
             >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </Button>
@@ -443,11 +509,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         <div className="animate-fade-in">
           <AudioControls
             volume={volume}
-            onVolumeChange={setVolume}
+            onVolumeChange={handleVolumeChange}
             playbackRate={playbackRate}
             onPlaybackRateChange={setPlaybackRate}
             isMuted={isMuted}
-            onMuteToggle={() => setIsMuted(!isMuted)}
+            onMuteToggle={handleMuteToggle}
             audioQuality={audioQuality}
             onQualityChange={setAudioQuality}
           />
