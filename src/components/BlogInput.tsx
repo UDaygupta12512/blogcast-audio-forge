@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -5,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useToast } from "@/hooks/use-toast"
 import { parseUrlContent, cleanContent, ParsedContent } from '../utils/contentParser';
 import ContentVisual from './ContentVisual';
+import { ExternalLink, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface BlogInputProps {
   onSubmit: (content: any, options: any) => void;
@@ -25,19 +28,36 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
   const [includeOutro, setIncludeOutro] = useState(true);
   const [maxDuration, setMaxDuration] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleUrlSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!url.trim()) return;
+
     setIsLoading(true);
+    setUrlError(null);
+    
     try {
+      // Validate URL format
+      new URL(url);
+      
+      console.log('Starting URL parsing for:', url);
       const content = await parseUrlContent(url);
       setParsedContent(content);
+      
+      toast({
+        title: "✅ Content Extracted Successfully!",
+        description: `Found ${content.metadata.wordCount} words from the article.`,
+      });
     } catch (error) {
       console.error('Error parsing URL:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to parse content from the URL.";
+      setUrlError(errorMessage);
+      
       toast({
-        title: "Parsing Failed",
-        description: "Failed to parse content from the URL. Please check the URL and try again.",
+        title: "URL Parsing Failed",
+        description: "The content couldn't be extracted. Try copying the text directly instead.",
         variant: "destructive"
       });
     } finally {
@@ -47,10 +67,16 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
 
   const handleContentSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!rawContent.trim()) return;
+
     setIsLoading(true);
     try {
       const cleanedContent = cleanContent(rawContent);
-      // Simulate content parsing
+      
+      if (cleanedContent.length < 100) {
+        throw new Error("Content is too short. Please provide at least 100 characters of content.");
+      }
+      
       const simulatedParsedContent = {
         title: 'Custom Content',
         content: cleanedContent,
@@ -64,11 +90,16 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
         }
       };
       setParsedContent(simulatedParsedContent as ParsedContent);
+      
+      toast({
+        title: "✅ Content Processed!",
+        description: `Ready to generate podcast from ${simulatedParsedContent.metadata.wordCount} words.`,
+      });
     } catch (error) {
       console.error('Error cleaning content:', error);
       toast({
         title: "Content Processing Failed",
-        description: "Failed to process the content. Please check the content and try again.",
+        description: error instanceof Error ? error.message : "Failed to process the content.",
         variant: "destructive"
       });
     } finally {
@@ -95,12 +126,18 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
     });
   };
 
+  const suggestedUrls = [
+    { name: "Medium", url: "https://medium.com/@username/article-title" },
+    { name: "Dev.to", url: "https://dev.to/username/article-title" },
+    { name: "Personal Blog", url: "https://yourblog.com/article" },
+  ];
+
   return (
     <div className="space-y-8">
       <div className="text-center space-y-4">
         <h3 className="text-2xl font-bold">Transform Your Blog into a Podcast</h3>
         <p className="text-muted-foreground">
-          Enter a blog URL or paste content directly. Our AI will analyze the content and create a personalized podcast experience.
+          Enter a blog URL or paste content directly. Our enhanced system works with most websites including Medium, Dev.to, and personal blogs.
         </p>
       </div>
 
@@ -115,7 +152,10 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
           <Card className="p-6 glass border-white/10">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-lg">Content Analysis</h4>
+                <h4 className="font-semibold text-lg flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-400" />
+                  Content Analysis
+                </h4>
                 <Badge variant="outline" className="text-xs">
                   {parsedContent.metadata.readingTime}
                 </Badge>
@@ -127,15 +167,15 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
                   <div className="text-xs text-muted-foreground">Words</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-white/5">
-                  <div className="font-semibold text-blue-400">{parsedContent.contentType}</div>
+                  <div className="font-semibold text-blue-400 capitalize">{parsedContent.contentType}</div>
                   <div className="text-xs text-muted-foreground">Category</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-white/5">
-                  <div className="font-semibold text-green-400">{parsedContent.suggestedVoice}</div>
+                  <div className="font-semibold text-green-400 capitalize">{parsedContent.suggestedVoice}</div>
                   <div className="text-xs text-muted-foreground">Suggested Voice</div>
                 </div>
                 <div className="text-center p-3 rounded-lg bg-white/5">
-                  <div className="font-semibold text-orange-400">~5 min</div>
+                  <div className="font-semibold text-orange-400">~{Math.ceil(parsedContent.metadata.wordCount / 150)} min</div>
                   <div className="text-xs text-muted-foreground">Est. Duration</div>
                 </div>
               </div>
@@ -147,21 +187,44 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
       {/* URL Input Section */}
       <Card className="p-6 glass border-white/10">
         <div className="space-y-4">
-          <h4 className="text-lg font-semibold">Generate from URL</h4>
+          <div className="flex items-center gap-2">
+            <ExternalLink className="w-5 h-5" />
+            <h4 className="text-lg font-semibold">Generate from URL</h4>
+          </div>
           <p className="text-sm text-muted-foreground">
-            Enter the URL of a blog post to automatically extract and analyze its content.
+            Enter the URL of a blog post. Our enhanced system works with most websites and includes multiple fallback methods.
           </p>
-          <form onSubmit={handleUrlSubmit} className="flex space-x-2">
-            <Input
-              type="url"
-              placeholder="Enter blog URL..."
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              disabled={isLoading}
-            />
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Loading...' : 'Parse URL'}
-            </Button>
+          
+          {urlError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-sm whitespace-pre-line">
+                {urlError}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          <form onSubmit={handleUrlSubmit} className="space-y-3">
+            <div className="flex space-x-2">
+              <Input
+                type="url"
+                placeholder="https://example.com/blog-post"
+                value={url}
+                onChange={(e) => {
+                  setUrl(e.target.value);
+                  setUrlError(null);
+                }}
+                disabled={isLoading}
+                className="flex-1"
+              />
+              <Button type="submit" disabled={isLoading || !url.trim()}>
+                {isLoading ? 'Extracting...' : 'Extract Content'}
+              </Button>
+            </div>
+            
+            <div className="text-xs text-muted-foreground">
+              <strong>Works best with:</strong> Medium, Dev.to, personal blogs, news sites, and most content websites
+            </div>
           </form>
         </div>
       </Card>
@@ -171,19 +234,27 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
         <div className="space-y-4">
           <h4 className="text-lg font-semibold">Paste Content Directly</h4>
           <p className="text-sm text-muted-foreground">
-            Alternatively, paste the content of your blog post directly into the text area below.
+            If URL extraction doesn't work, copy and paste the article content here.
           </p>
-          <form onSubmit={handleContentSubmit} className="space-y-2">
+          <form onSubmit={handleContentSubmit} className="space-y-3">
             <Textarea
-              placeholder="Paste blog content here..."
+              placeholder="Paste your blog content here... (minimum 100 characters)"
               value={rawContent}
               onChange={(e) => setRawContent(e.target.value)}
-              rows={4}
+              rows={6}
               disabled={isLoading}
             />
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Loading...' : 'Process Content'}
-            </Button>
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-muted-foreground">
+                {rawContent.length} characters {rawContent.length < 100 && rawContent.length > 0 && '(minimum 100 required)'}
+              </div>
+              <Button 
+                type="submit" 
+                disabled={isLoading || rawContent.trim().length < 100}
+              >
+                {isLoading ? 'Processing...' : 'Process Content'}
+              </Button>
+            </div>
           </form>
         </div>
       </Card>
@@ -202,7 +273,7 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
                     <SelectValue placeholder="Select a voice" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="aria">Aria</SelectItem>
+                    <SelectItem value="aria">Aria (Recommended)</SelectItem>
                     <SelectItem value="sarah">Sarah</SelectItem>
                     <SelectItem value="charlie">Charlie</SelectItem>
                     <SelectItem value="laura">Laura</SelectItem>
@@ -213,48 +284,60 @@ const BlogInput: React.FC<BlogInputProps> = ({ onSubmit }) => {
 
               <div>
                 <Label>Tone</Label>
-                <RadioGroup defaultValue={tone} className="flex space-x-2" onValueChange={setTone}>
-                  <RadioGroupItem value="professional" id="tone-professional" className="peer h-5 w-5 rounded-full border-2 border-muted ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" />
-                  <Label htmlFor="tone-professional" className="cursor-pointer">Professional</Label>
-                  <RadioGroupItem value="casual" id="tone-casual" className="peer h-5 w-5 rounded-full border-2 border-muted ring-offset-background focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground" />
-                  <Label htmlFor="tone-casual" className="cursor-pointer">Casual</Label>
+                <RadioGroup defaultValue={tone} className="flex space-x-4 mt-2" onValueChange={setTone}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="professional" id="tone-professional" />
+                    <Label htmlFor="tone-professional" className="cursor-pointer">Professional</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="casual" id="tone-casual" />
+                    <Label htmlFor="tone-casual" className="cursor-pointer">Casual</Label>
+                  </div>
                 </RadioGroup>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="includeIntro">Include Intro</Label>
-                <Input
+              <div className="flex items-center space-x-2">
+                <input
                   type="checkbox"
                   id="includeIntro"
                   checked={includeIntro}
                   onChange={(e) => setIncludeIntro(e.target.checked)}
+                  className="rounded"
                 />
+                <Label htmlFor="includeIntro" className="cursor-pointer">Include Intro</Label>
               </div>
 
-              <div>
-                <Label htmlFor="includeOutro">Include Outro</Label>
-                <Input
+              <div className="flex items-center space-x-2">
+                <input
                   type="checkbox"
                   id="includeOutro"
                   checked={includeOutro}
                   onChange={(e) => setIncludeOutro(e.target.checked)}
+                  className="rounded"
                 />
+                <Label htmlFor="includeOutro" className="cursor-pointer">Include Outro</Label>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="maxDuration">Max Duration (minutes)</Label>
-              <Input
-                type="number"
+              <Label htmlFor="maxDuration">Target Duration (minutes): {maxDuration}</Label>
+              <input
+                type="range"
                 id="maxDuration"
+                min="3"
+                max="15"
                 value={maxDuration}
                 onChange={(e) => setMaxDuration(parseInt(e.target.value))}
+                className="w-full mt-2"
               />
+              <div className="text-xs text-muted-foreground mt-1">
+                Longer durations include more detailed analysis and commentary
+              </div>
             </div>
 
-            <Button onClick={handleGeneratePodcast} className="w-full">
+            <Button onClick={handleGeneratePodcast} className="w-full" size="lg">
               Generate Podcast
             </Button>
           </div>
