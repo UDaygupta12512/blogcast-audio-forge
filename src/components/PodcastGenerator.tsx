@@ -4,15 +4,19 @@ import BlogInput from './BlogInput';
 import ProcessingSteps from './ProcessingSteps';
 import AudioPlayer from './AudioPlayer';
 import ScriptPreview from './ScriptPreview';
+import PodcastLibrary from './PodcastLibrary';
+import PodcastTemplateSelector, { type PodcastTemplate } from './PodcastTemplateSelector';
+import LanguageSelector, { type SupportedLanguage } from './LanguageSelector';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { generatePodcastScript, estimateScriptDuration } from '../utils/scriptGenerator';
 import { FreeTTSService, FREE_VOICE_OPTIONS, type SubtitleSegment } from '../services/freeTtsService';
 import { useToast } from '@/hooks/use-toast';
-import { Volume2 } from 'lucide-react';
+import { Volume2, Library, Sparkles } from 'lucide-react';
 
 export interface PodcastData {
   title: string;
@@ -32,6 +36,9 @@ const PodcastGenerator = () => {
   const [audioQuality, setAudioQuality] = useState<'standard' | 'high'>('standard');
   const [speed, setSpeed] = useState<number>(1);
   const [selectedVoice, setSelectedVoice] = useState<string>('');
+  const [selectedLanguage, setSelectedLanguage] = useState<SupportedLanguage>('en-US');
+  const [selectedTemplate, setSelectedTemplate] = useState<PodcastTemplate>('standard');
+  const [activeTab, setActiveTab] = useState<'create' | 'library'>('create');
   const { toast } = useToast();
 
   const handleApiKeySubmit = async () => {
@@ -77,22 +84,26 @@ const PodcastGenerator = () => {
       const script = generatePodcastScript(content, {
         ...options,
         quality: audioQuality,
-        speed: speed
+        speed: speed,
+        template: selectedTemplate,
+        language: selectedLanguage
       });
       const duration = estimateScriptDuration(script);
       
-      setPodcastData({
+      const newPodcast: PodcastData = {
         title: content.title,
         script,
         duration,
         voice: selectedVoice || 'Chrome Default',
         music: options.music
-      });
+      };
+      
+      setPodcastData(newPodcast);
 
       setIsGeneratingAudio(true);
       const ttsService = new FreeTTSService();
       
-      console.log('Generating audio with free TTS, voice:', selectedVoice);
+      console.log('Generating audio with free TTS, voice:', selectedVoice, 'language:', selectedLanguage);
       
       const { audioUrl, subtitles } = await ttsService.generateAudio({
         text: script,
@@ -102,7 +113,12 @@ const PodcastGenerator = () => {
         volume: 1,
       });
 
-      setPodcastData(prev => prev ? { ...prev, audioUrl, subtitles } : null);
+      const completedPodcast = { ...newPodcast, audioUrl, subtitles };
+      setPodcastData(completedPodcast);
+      
+      // Save to library
+      savePodcastToLibrary(completedPodcast);
+      
       setStep('complete');
       
       toast({
@@ -122,6 +138,26 @@ const PodcastGenerator = () => {
     } finally {
       setIsGeneratingAudio(false);
     }
+  };
+
+  const savePodcastToLibrary = (podcast: PodcastData) => {
+    const saved = {
+      ...podcast,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      language: selectedLanguage,
+      template: selectedTemplate
+    };
+    
+    const existing = JSON.parse(localStorage.getItem('podcast-library') || '[]');
+    const updated = [saved, ...existing].slice(0, 20); // Keep last 20
+    localStorage.setItem('podcast-library', JSON.stringify(updated));
+  };
+
+  const loadPodcastFromLibrary = (podcast: PodcastData) => {
+    setPodcastData(podcast);
+    setStep('complete');
+    setActiveTab('create');
   };
 
   const resetGenerator = () => {
@@ -197,38 +233,70 @@ const PodcastGenerator = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       <div className="text-center space-y-4">
         <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent">
           Free AI Podcast Creation
         </h2>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Transform any blog post into a professional podcast episode with free speech synthesis and subtitles.
+          Transform any blog post into a professional podcast with AI-powered features, multiple languages, and creative templates.
         </p>
       </div>
 
-      <Card className="p-8 glass border-0 shadow-2xl">
-        {step === 'input' && <BlogInput onSubmit={handleBlogSubmit} />}
-        {step === 'processing' && (
-          <ProcessingSteps 
-            customSteps={[
-              'Parsing and analyzing content',
-              'Generating podcast script',
-              'Creating subtitle timestamps',
-              isGeneratingAudio ? 'Converting to speech...' : 'Preparing audio generation'
-            ]}
-          />
-        )}
-        {step === 'complete' && podcastData && (
-          <div className="space-y-6">
-            <ScriptPreview 
-              script={podcastData.script} 
-              estimatedDuration={podcastData.duration || '5:00'} 
-            />
-            <AudioPlayer podcastData={podcastData} onReset={resetGenerator} />
-          </div>
-        )}
-      </Card>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'create' | 'library')} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+          <TabsTrigger value="create" className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            Create Podcast
+          </TabsTrigger>
+          <TabsTrigger value="library" className="flex items-center gap-2">
+            <Library className="w-4 h-4" />
+            My Library
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="create" className="space-y-6 mt-8">
+          <Card className="p-8 glass border-0 shadow-2xl">
+            {step === 'input' && (
+              <div className="space-y-8">
+                <PodcastTemplateSelector 
+                  selectedTemplate={selectedTemplate}
+                  onTemplateChange={setSelectedTemplate}
+                />
+                <LanguageSelector 
+                  selectedLanguage={selectedLanguage}
+                  onLanguageChange={setSelectedLanguage}
+                />
+                <BlogInput onSubmit={handleBlogSubmit} />
+              </div>
+            )}
+            {step === 'processing' && (
+              <ProcessingSteps 
+                customSteps={[
+                  'Parsing and analyzing content',
+                  `Applying ${selectedTemplate} template`,
+                  `Generating podcast in ${selectedLanguage}`,
+                  'Creating subtitle timestamps',
+                  isGeneratingAudio ? 'Converting to speech...' : 'Preparing audio generation'
+                ]}
+              />
+            )}
+            {step === 'complete' && podcastData && (
+              <div className="space-y-6">
+                <ScriptPreview 
+                  script={podcastData.script} 
+                  estimatedDuration={podcastData.duration || '5:00'} 
+                />
+                <AudioPlayer podcastData={podcastData} onReset={resetGenerator} />
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="library" className="mt-8">
+          <PodcastLibrary onLoadPodcast={loadPodcastFromLibrary} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

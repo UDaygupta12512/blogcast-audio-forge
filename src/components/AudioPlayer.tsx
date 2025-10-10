@@ -5,7 +5,10 @@ import { Card } from '@/components/ui/card';
 import { Play, Pause, Download, Share2, RotateCcw, Subtitles, Volume2, VolumeX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import AudioControls from './AudioControls';
+import AudioWaveform from './AudioWaveform';
+import ChapterMarkers, { type Chapter } from './ChapterMarkers';
 import { FreeTTSService } from '../services/freeTtsService';
+import { generateChapters } from '@/utils/chapterGenerator';
 import type { PodcastData } from './PodcastGenerator';
 
 interface AudioPlayerProps {
@@ -27,11 +30,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [showControls, setShowControls] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const ttsServiceRef = useRef<FreeTTSService | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedAtRef = useRef<number>(0);
   const { toast } = useToast();
+
+  // Generate chapters from script
+  useEffect(() => {
+    if (podcastData.script && duration > 0) {
+      const generatedChapters = generateChapters(podcastData.script, duration);
+      setChapters(generatedChapters);
+    }
+  }, [podcastData.script, duration]);
 
   // Initialize TTS service with better error handling
   useEffect(() => {
@@ -518,6 +530,29 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
             onQualityChange={setAudioQuality}
           />
         </div>
+      )}
+
+      {/* Audio Waveform Visualizer */}
+      <AudioWaveform 
+        isPlaying={isPlaying && !isPaused} 
+        currentTime={currentTime} 
+        duration={duration} 
+      />
+
+      {/* Chapter Markers */}
+      {chapters.length > 0 && (
+        <ChapterMarkers 
+          chapters={chapters} 
+          currentTime={currentTime}
+          onSeek={(time) => {
+            pausedAtRef.current = time;
+            setCurrentTime(time);
+            if (isPlaying) {
+              togglePlayback(); // pause
+              setTimeout(() => togglePlayback(), 100); // resume at new position
+            }
+          }}
+        />
       )}
 
       {/* Enhanced Action Buttons */}
