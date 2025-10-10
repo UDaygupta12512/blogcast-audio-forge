@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Play, Download, Share2, Clock, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { PodcastData } from './PodcastGenerator';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SavedPodcast extends PodcastData {
   id: string;
@@ -25,21 +26,62 @@ const PodcastLibrary: React.FC<PodcastLibraryProps> = ({ onLoadPodcast }) => {
     loadPodcasts();
   }, []);
 
-  const loadPodcasts = () => {
-    const stored = localStorage.getItem('podcast-library');
-    if (stored) {
-      setSavedPodcasts(JSON.parse(stored));
+  const loadPodcasts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('podcasts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      const formatted = data.map(p => ({
+        id: p.id,
+        title: p.title,
+        script: p.script,
+        duration: p.duration || '5:00',
+        voice: p.voice,
+        music: p.music,
+        audioUrl: p.audio_url || undefined,
+        createdAt: p.created_at,
+        language: p.language || 'en-US',
+        template: p.template || 'standard',
+      }));
+
+      setSavedPodcasts(formatted);
+    } catch (error) {
+      console.error('Error loading podcasts:', error);
+      toast({
+        title: "Error loading podcasts",
+        description: "Failed to load your podcast library",
+        variant: "destructive",
+      });
     }
   };
 
-  const deletePodcast = (id: string) => {
-    const updated = savedPodcasts.filter(p => p.id !== id);
-    setSavedPodcasts(updated);
-    localStorage.setItem('podcast-library', JSON.stringify(updated));
-    toast({
-      title: "Podcast Deleted",
-      description: "Podcast removed from your library.",
-    });
+  const deletePodcast = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('podcasts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setSavedPodcasts(prev => prev.filter(p => p.id !== id));
+      
+      toast({
+        title: "Podcast deleted",
+        description: "Successfully removed from your library",
+      });
+    } catch (error) {
+      console.error('Error deleting podcast:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete podcast",
+        variant: "destructive",
+      });
+    }
   };
 
   const sharePodcast = async (podcast: SavedPodcast) => {

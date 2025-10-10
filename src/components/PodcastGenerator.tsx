@@ -17,6 +17,7 @@ import { generatePodcastScript, estimateScriptDuration } from '../utils/scriptGe
 import { FreeTTSService, FREE_VOICE_OPTIONS, type SubtitleSegment } from '../services/freeTtsService';
 import { useToast } from '@/hooks/use-toast';
 import { Volume2, Library, Sparkles } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface PodcastData {
   title: string;
@@ -140,18 +141,27 @@ const PodcastGenerator = () => {
     }
   };
 
-  const savePodcastToLibrary = (podcast: PodcastData) => {
-    const saved = {
-      ...podcast,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      language: selectedLanguage,
-      template: selectedTemplate
-    };
-    
-    const existing = JSON.parse(localStorage.getItem('podcast-library') || '[]');
-    const updated = [saved, ...existing].slice(0, 20); // Keep last 20
-    localStorage.setItem('podcast-library', JSON.stringify(updated));
+  const savePodcastToLibrary = async (podcast: PodcastData) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.from('podcasts').insert({
+        user_id: user.id,
+        title: podcast.title,
+        script: podcast.script,
+        duration: podcast.duration,
+        voice: podcast.voice,
+        music: podcast.music,
+        language: selectedLanguage,
+        template: selectedTemplate,
+        audio_url: podcast.audioUrl,
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving podcast:', error);
+    }
   };
 
   const loadPodcastFromLibrary = (podcast: PodcastData) => {
