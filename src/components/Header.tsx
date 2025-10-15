@@ -1,13 +1,14 @@
 import React from 'react';
-import { Mic, LogOut, User } from 'lucide-react';
+import { Mic, LogOut, User, BarChart3, Home, Compass } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Avatar, AvatarFallback } from './ui/avatar';
 
 const Header = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSignOut = async () => {
     await signOut();
@@ -29,6 +30,33 @@ const Header = () => {
           
           {user && (
             <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className={`gap-2 ${location.pathname === '/' ? 'bg-purple-500/20' : ''}`}
+              >
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">Home</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/discover')}
+                className={`gap-2 ${location.pathname === '/discover' ? 'bg-purple-500/20' : ''}`}
+              >
+                <Compass className="h-4 w-4" />
+                <span className="hidden sm:inline">Discover</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/analytics')}
+                className={`gap-2 ${location.pathname === '/analytics' ? 'bg-purple-500/20' : ''}`}
+              >
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Analytics</span>
+              </Button>
               <div className="flex items-center gap-2">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-purple-500/20">

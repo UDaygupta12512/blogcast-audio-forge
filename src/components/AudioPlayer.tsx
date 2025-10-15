@@ -9,14 +9,17 @@ import AudioWaveform from './AudioWaveform';
 import ChapterMarkers, { type Chapter } from './ChapterMarkers';
 import { FreeTTSService } from '../services/freeTtsService';
 import { generateChapters } from '@/utils/chapterGenerator';
+import { trackPodcastEvent } from '@/utils/analyticsTracker';
 import type { PodcastData } from './PodcastGenerator';
 
 interface AudioPlayerProps {
   podcastData: PodcastData;
   onReset: () => void;
+  podcastId?: string;
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset, podcastId }) => {
+  const playStartTimeRef = useRef<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -135,6 +138,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
       pausedAtRef.current = currentTime;
       setIsLoading(false);
       setSpeechError(null);
+      
+      // Track pause event
+      if (podcastId) {
+        const listenDuration = Math.floor(currentTime - playStartTimeRef.current);
+        trackPodcastEvent(podcastId, 'pause', listenDuration);
+      }
     } else {
       try {
         setIsLoading(true);
@@ -154,6 +163,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         
         setIsPlaying(true);
         setIsPaused(false);
+        playStartTimeRef.current = currentTime;
+        
+        // Track play event
+        if (podcastId) {
+          trackPodcastEvent(podcastId, 'play', 0);
+        }
         
         // If resuming, don't reset current time
         if (!isPaused) {
@@ -177,6 +192,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         console.log('✅ Speech synthesis completed successfully');
         setIsPlaying(false);
         setIsPaused(false);
+        
+        // Track completion
+        if (podcastId) {
+          trackPodcastEvent(podcastId, 'complete', Math.floor(currentTime));
+        }
+        
         setCurrentTime(0);
         
         toast({
@@ -281,6 +302,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     link.click();
     URL.revokeObjectURL(url);
     
+    // Track download event
+    if (podcastId) {
+      trackPodcastEvent(podcastId, 'download', 0);
+    }
+    
     toast({
       title: "Script Downloaded! 📄",
       description: "Your podcast script has been saved to your downloads.",
@@ -289,6 +315,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
 
   const handleShare = () => {
     navigator.clipboard.writeText(podcastData.script);
+    
+    // Track share event
+    if (podcastId) {
+      trackPodcastEvent(podcastId, 'share', 0);
+    }
+    
     toast({
       title: "Script Copied! 📋",
       description: "Podcast script copied to clipboard - ready to share!",

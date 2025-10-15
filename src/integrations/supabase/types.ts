@@ -14,15 +14,134 @@ export type Database = {
   }
   public: {
     Tables: {
+      podcast_analytics: {
+        Row: {
+          city: string | null
+          country: string | null
+          device_type: string | null
+          event_type: string
+          id: string
+          listen_duration: number | null
+          podcast_id: string
+          session_id: string
+          timestamp: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          city?: string | null
+          country?: string | null
+          device_type?: string | null
+          event_type: string
+          id?: string
+          listen_duration?: number | null
+          podcast_id: string
+          session_id?: string
+          timestamp?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          city?: string | null
+          country?: string | null
+          device_type?: string | null
+          event_type?: string
+          id?: string
+          listen_duration?: number | null
+          podcast_id?: string
+          session_id?: string
+          timestamp?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_analytics_podcast_id_fkey"
+            columns: ["podcast_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      podcast_comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          podcast_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          podcast_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          podcast_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_comments_podcast_id_fkey"
+            columns: ["podcast_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      podcast_series: {
+        Row: {
+          cover_image_url: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cover_image_url?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       podcasts: {
         Row: {
           audio_url: string | null
           created_at: string
           duration: string | null
+          episode_number: number | null
           id: string
+          is_public: boolean | null
           language: string | null
           music: string | null
+          rss_enabled: boolean | null
           script: string
+          series_id: string | null
           template: string | null
           title: string
           updated_at: string
@@ -33,10 +152,14 @@ export type Database = {
           audio_url?: string | null
           created_at?: string
           duration?: string | null
+          episode_number?: number | null
           id?: string
+          is_public?: boolean | null
           language?: string | null
           music?: string | null
+          rss_enabled?: boolean | null
           script: string
+          series_id?: string | null
           template?: string | null
           title: string
           updated_at?: string
@@ -47,17 +170,29 @@ export type Database = {
           audio_url?: string | null
           created_at?: string
           duration?: string | null
+          episode_number?: number | null
           id?: string
+          is_public?: boolean | null
           language?: string | null
           music?: string | null
+          rss_enabled?: boolean | null
           script?: string
+          series_id?: string | null
           template?: string | null
           title?: string
           updated_at?: string
           user_id?: string
           voice?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "podcasts_series_id_fkey"
+            columns: ["series_id"]
+            isOneToOne: false
+            referencedRelation: "podcast_series"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
