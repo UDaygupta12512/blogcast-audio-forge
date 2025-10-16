@@ -7,6 +7,8 @@ import { useToast } from '@/hooks/use-toast';
 import AudioControls from './AudioControls';
 import AudioWaveform from './AudioWaveform';
 import ChapterMarkers, { type Chapter } from './ChapterMarkers';
+import SocialClipGenerator from './SocialClipGenerator';
+import SummaryGenerator from './SummaryGenerator';
 import { FreeTTSService } from '../services/freeTtsService';
 import { generateChapters } from '@/utils/chapterGenerator';
 import { trackPodcastEvent } from '@/utils/analyticsTracker';
@@ -613,6 +615,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset, podcast
           <RotateCcw className="w-4 h-4" />
           Create Another
         </Button>
+      </div>
+
+      {/* Social Clip Generator */}
+      <div className="mt-6">
+        <SocialClipGenerator 
+          podcastId={podcastId || ''}
+          script={podcastData.script}
+          audioUrl={podcastData.audioUrl}
+          duration={podcastData.duration || ''}
+        />
+      </div>
+
+      {/* Summary Generator */}
+      <div className="mt-6">
+        <SummaryGenerator 
+          podcastId={podcastId || ''}
+          script={podcastData.script}
+          title={podcastData.title}
+        />
       </div>
     </div>
   );
