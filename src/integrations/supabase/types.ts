@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      challenge_submissions: {
+        Row: {
+          challenge_id: string
+          created_at: string
+          id: string
+          podcast_id: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          created_at?: string
+          id?: string
+          podcast_id: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          created_at?: string
+          id?: string
+          podcast_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "challenge_submissions_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "community_challenges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "challenge_submissions_podcast_id_fkey"
+            columns: ["podcast_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      community_challenges: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          end_date: string
+          id: string
+          is_active: boolean
+          start_date: string
+          theme: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description: string
+          end_date: string
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          theme: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          end_date?: string
+          id?: string
+          is_active?: boolean
+          start_date?: string
+          theme?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       podcast_analytics: {
         Row: {
           city: string | null
@@ -58,6 +136,64 @@ export type Database = {
           {
             foreignKeyName: "podcast_analytics_podcast_id_fkey"
             columns: ["podcast_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      podcast_collaborations: {
+        Row: {
+          collab_podcast_id: string | null
+          created_at: string
+          creator_one_id: string
+          creator_two_id: string
+          id: string
+          podcast_one_id: string
+          podcast_two_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          collab_podcast_id?: string | null
+          created_at?: string
+          creator_one_id: string
+          creator_two_id: string
+          id?: string
+          podcast_one_id: string
+          podcast_two_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          collab_podcast_id?: string | null
+          created_at?: string
+          creator_one_id?: string
+          creator_two_id?: string
+          id?: string
+          podcast_one_id?: string
+          podcast_two_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "podcast_collaborations_collab_podcast_id_fkey"
+            columns: ["collab_podcast_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_collaborations_podcast_one_id_fkey"
+            columns: ["podcast_one_id"]
+            isOneToOne: false
+            referencedRelation: "podcasts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "podcast_collaborations_podcast_two_id_fkey"
+            columns: ["podcast_two_id"]
             isOneToOne: false
             referencedRelation: "podcasts"
             referencedColumns: ["id"]

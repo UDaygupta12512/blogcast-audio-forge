@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PodcastGenerator from '../components/PodcastGenerator';
 import Header from '../components/Header';
+import CollaborationHub from '../components/CollaborationHub';
+import CommunityChallenges from '../components/CommunityChallenges';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 
@@ -31,7 +33,14 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-900/20 via-pink-900/20 to-blue-900/20">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        <PodcastGenerator />
+        <div className="space-y-6">
+          <PodcastGenerator />
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <CollaborationHub />
+            <CommunityChallenges />
+          </div>
+        </div>
       </main>
     </div>
   );
