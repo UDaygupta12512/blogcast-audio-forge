@@ -170,16 +170,52 @@ const CollaborationHub: React.FC = () => {
           </TabsList>
 
           <TabsContent value="create" className="space-y-4">
-            {myPodcasts.length === 0 || publicPodcasts.length === 0 ? (
-              <div className="text-center py-8 space-y-3">
+            {myPodcasts.length === 0 ? (
+              <div className="text-center py-8 space-y-4">
+                <Users className="w-12 h-12 mx-auto text-primary opacity-70" />
+                <div>
+                  <h4 className="text-base font-semibold mb-2">Create Your First Podcast</h4>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    You need at least one public podcast to start collaborating with other creators
+                  </p>
+                  <Button 
+                    onClick={() => window.location.href = '/'}
+                    className="mx-auto"
+                  >
+                    Create Podcast
+                  </Button>
+                </div>
+                <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20 text-left">
+                  <p className="text-xs font-semibold mb-2">💡 How AI Collaboration Works:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1.5">
+                    <li>1. Create and publish your podcast as "public"</li>
+                    <li>2. Browse public podcasts from other creators</li>
+                    <li>3. Send collaboration requests to merge content</li>
+                    <li>4. AI creates a co-hosted episode with both voices</li>
+                    <li>5. Share the collaborative podcast with both audiences</li>
+                  </ul>
+                </div>
+              </div>
+            ) : publicPodcasts.length === 0 ? (
+              <div className="text-center py-8 space-y-4">
                 <Users className="w-12 h-12 mx-auto text-muted-foreground opacity-50" />
                 <div>
-                  <p className="text-sm font-medium">No podcasts available for collaboration</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {myPodcasts.length === 0 
-                      ? "Create and publish a podcast first to start collaborating"
-                      : "Waiting for other creators to publish public podcasts"}
+                  <h4 className="text-base font-semibold mb-2">No Collaborators Yet</h4>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Be the first in your network! Share your podcast and invite creators
                   </p>
+                  <p className="text-xs text-muted-foreground">
+                    Other creators will appear here once they publish public podcasts
+                  </p>
+                </div>
+                <div className="mt-6 p-4 bg-primary/5 rounded-lg border border-primary/20 text-left">
+                  <p className="text-xs font-semibold mb-2">🎯 While You Wait:</p>
+                  <ul className="text-xs text-muted-foreground space-y-1.5">
+                    <li>• Create more public podcasts to expand your library</li>
+                    <li>• Share your podcast links to attract collaborators</li>
+                    <li>• Join Community Challenges to connect with creators</li>
+                    <li>• Explore the Discover page to find content</li>
+                  </ul>
                 </div>
               </div>
             ) : (
@@ -257,9 +293,32 @@ const CollaborationHub: React.FC = () => {
 
           <TabsContent value="requests" className="space-y-3">
             {collaborations.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No collaboration requests yet
-              </p>
+              <div className="text-center py-8 space-y-4">
+                <Podcast className="w-12 h-12 mx-auto text-muted-foreground opacity-50" />
+                <div>
+                  <h4 className="text-base font-semibold mb-2">No Requests Yet</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Incoming and outgoing collaboration requests will appear here
+                  </p>
+                </div>
+                <div className="mt-4 p-4 bg-muted/50 rounded-lg text-left">
+                  <p className="text-xs font-semibold mb-2">📋 Request Status Guide:</p>
+                  <div className="space-y-2 text-xs text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <Badge variant="secondary" className="text-xs">Pending</Badge>
+                      <span>Waiting for response</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Badge variant="default" className="text-xs">Accepted</Badge>
+                      <span>AI is merging podcasts</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <Badge variant="default" className="text-xs">Completed</Badge>
+                      <span>Collaborative episode ready</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               collaborations.map((collab) => (
                 <Card key={collab.id} className="p-4 bg-background/50 border-white/10">
