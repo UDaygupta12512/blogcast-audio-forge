@@ -1,1 +1,4 @@
 project_id = "qonjazlqjrtsokupodtf"
+
+[functions.merge-podcasts]
+verify_jwt = true

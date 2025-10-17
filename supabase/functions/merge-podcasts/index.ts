@@ -12,15 +12,49 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get user from JWT
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { collaborationId } = await req.json();
     
-    const supabaseClient = createClient(
+    // Validate collaborationId
+    if (!collaborationId || typeof collaborationId !== 'string') {
+      return new Response(
+        JSON.stringify({ error: 'Invalid collaboration ID' }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Use service role key for database operations
+    const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Get collaboration details
-    const { data: collab, error: collabError } = await supabaseClient
+    const { data: collab, error: collabError } = await supabaseAdmin
       .from('podcast_collaborations')
       .select(`
         *,
@@ -31,6 +65,14 @@ serve(async (req) => {
       .single();
 
     if (collabError) throw collabError;
+
+    // Verify user is part of collaboration
+    if (collab.creator_one_id !== user.id && collab.creator_two_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: 'Not authorized for this collaboration' }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -82,7 +124,7 @@ Create a merged co-hosted episode combining both topics.`;
     const mergedScript = aiData.choices?.[0]?.message?.content || '';
 
     // Create merged podcast
-    const { data: newPodcast, error: podcastError } = await supabaseClient
+    const { data: newPodcast, error: podcastError } = await supabaseAdmin
       .from('podcasts')
       .insert({
         title: `${collab.podcast_one.title} × ${collab.podcast_two.title}`,
@@ -98,7 +140,7 @@ Create a merged co-hosted episode combining both topics.`;
     if (podcastError) throw podcastError;
 
     // Update collaboration
-    const { error: updateError } = await supabaseClient
+    const { error: updateError } = await supabaseAdmin
       .from('podcast_collaborations')
       .update({
         status: 'completed',
