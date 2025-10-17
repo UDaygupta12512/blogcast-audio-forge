@@ -104,10 +104,27 @@ const Discover = () => {
           </div>
         ) : podcasts.length === 0 ? (
           <Card className="border-purple-500/20 bg-black/40 backdrop-blur">
-            <CardContent className="text-center py-12">
-              <p className="text-muted-foreground">
-                No public podcasts available yet. Be the first to share!
+            <CardContent className="text-center py-16">
+              <Play className="w-16 h-16 text-purple-400 mx-auto mb-6 opacity-50" />
+              <h3 className="text-2xl font-bold mb-3">No Public Podcasts Yet</h3>
+              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                The community hasn't shared any podcasts yet. Be the first to create and share your podcast!
               </p>
+              <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-6 max-w-lg mx-auto">
+                <h4 className="font-semibold mb-3 text-purple-400">How to Share Your Podcast:</h4>
+                <div className="text-left space-y-2 text-sm text-muted-foreground">
+                  <p>1. Create a podcast from the home page</p>
+                  <p>2. Go to your Podcast Library</p>
+                  <p>3. Toggle "Make Public" on your podcast</p>
+                  <p>4. Your podcast will appear here for everyone to discover!</p>
+                </div>
+              </div>
+              <Button 
+                onClick={() => navigate('/')} 
+                className="mt-6 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+              >
+                Create Your First Podcast
+              </Button>
             </CardContent>
           </Card>
         ) : (
