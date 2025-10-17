@@ -149,9 +149,15 @@ const CommunityChallenges: React.FC = () => {
 
           <TabsContent value="active" className="space-y-4">
             {challenges.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No active challenges at the moment
-              </p>
+              <div className="text-center py-8 space-y-3">
+                <Trophy className="w-12 h-12 mx-auto text-muted-foreground opacity-50" />
+                <div>
+                  <p className="text-sm font-medium">No active challenges at the moment</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Check back soon for new weekly themed challenges!
+                  </p>
+                </div>
+              </div>
             ) : (
               <>
                 <Select value={selectedChallenge} onValueChange={setSelectedChallenge}>
@@ -232,9 +238,15 @@ const CommunityChallenges: React.FC = () => {
                 )}
 
                 <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <p className="text-xs text-muted-foreground">
-                    🎯 Join weekly themed challenges and showcase your AI-generated podcasts to the community!
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-foreground">🎯 About Challenges:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      <li>• Weekly themed challenges to inspire your content</li>
+                      <li>• Submit your best AI-generated podcast episodes</li>
+                      <li>• Compete with other creators in the community</li>
+                      <li>• Get discovered and grow your audience</li>
+                    </ul>
+                  </div>
                 </div>
               </>
             )}

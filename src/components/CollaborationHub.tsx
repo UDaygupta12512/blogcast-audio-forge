@@ -170,63 +170,89 @@ const CollaborationHub: React.FC = () => {
           </TabsList>
 
           <TabsContent value="create" className="space-y-4">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Your Podcast</label>
-                <Select value={selectedMyPodcast} onValueChange={setSelectedMyPodcast}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your podcast" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {myPodcasts.map((podcast) => (
-                      <SelectItem key={podcast.id} value={podcast.id}>
-                        {podcast.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {myPodcasts.length === 0 || publicPodcasts.length === 0 ? (
+              <div className="text-center py-8 space-y-3">
+                <Users className="w-12 h-12 mx-auto text-muted-foreground opacity-50" />
+                <div>
+                  <p className="text-sm font-medium">No podcasts available for collaboration</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {myPodcasts.length === 0 
+                      ? "Create and publish a podcast first to start collaborating"
+                      : "Waiting for other creators to publish public podcasts"}
+                  </p>
+                </div>
               </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Your Podcast</label>
+                  <Select value={selectedMyPodcast} onValueChange={setSelectedMyPodcast}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your podcast" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {myPodcasts.map((podcast) => (
+                        <SelectItem key={podcast.id} value={podcast.id}>
+                          {podcast.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Choose one of your public podcasts ({myPodcasts.length} available)
+                  </p>
+                </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Collaborate With</label>
-                <Select value={selectedPublicPodcast} onValueChange={setSelectedPublicPodcast}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a podcast to collaborate" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {publicPodcasts.map((podcast) => (
-                      <SelectItem key={podcast.id} value={podcast.id}>
-                        {podcast.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Collaborate With</label>
+                  <Select value={selectedPublicPodcast} onValueChange={setSelectedPublicPodcast}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a podcast to collaborate" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {publicPodcasts.map((podcast) => (
+                        <SelectItem key={podcast.id} value={podcast.id}>
+                          {podcast.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {publicPodcasts.length} public podcasts from other creators
+                  </p>
+                </div>
+
+                <Button 
+                  onClick={sendCollabRequest} 
+                  disabled={isLoading || !selectedMyPodcast || !selectedPublicPodcast}
+                  className="w-full"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4 mr-2" />
+                      Send Collaboration Request
+                    </>
+                  )}
+                </Button>
+
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-foreground">✨ How it works:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1">
+                      <li>• Select your podcast and a collaborator's podcast</li>
+                      <li>• Send a collaboration request to the creator</li>
+                      <li>• When accepted, AI merges both into a co-hosted episode</li>
+                      <li>• Both voices are used to create a natural conversation</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
-
-              <Button 
-                onClick={sendCollabRequest} 
-                disabled={isLoading || !selectedMyPodcast || !selectedPublicPodcast}
-                className="w-full"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4 mr-2" />
-                    Send Collaboration Request
-                  </>
-                )}
-              </Button>
-
-              <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <p className="text-xs text-muted-foreground">
-                  🎙️ AI will merge both podcasts into a co-hosted crossover episode using both voices!
-                </p>
-              </div>
-            </div>
+            )}
           </TabsContent>
 
           <TabsContent value="requests" className="space-y-3">
