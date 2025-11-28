@@ -18,6 +18,8 @@ interface Collaboration {
   collab_podcast_id: string | null;
   status: 'pending' | 'accepted' | 'rejected' | 'completed';
   created_at: string;
+  podcast_one_title?: string;
+  podcast_two_title?: string;
 }
 
 interface UserPodcast {
@@ -26,7 +28,11 @@ interface UserPodcast {
   user_id: string;
 }
 
-const CollaborationHub: React.FC = () => {
+interface CollaborationHubProps {
+  onCreatePodcast?: () => void;
+}
+
+const CollaborationHub: React.FC<CollaborationHubProps> = ({ onCreatePodcast }) => {
   const { session } = useAuth();
   const [myPodcasts, setMyPodcasts] = useState<UserPodcast[]>([]);
   const [publicPodcasts, setPublicPodcasts] = useState<UserPodcast[]>([]);
@@ -76,7 +82,21 @@ const CollaborationHub: React.FC = () => {
       .order('created_at', { ascending: false });
 
     if (!error && data) {
-      setCollaborations(data as Collaboration[]);
+      // Fetch podcast titles for each collaboration
+      const collabsWithTitles = await Promise.all(
+        data.map(async (collab) => {
+          const [p1, p2] = await Promise.all([
+            supabase.from('podcasts').select('title').eq('id', collab.podcast_one_id).single(),
+            supabase.from('podcasts').select('title').eq('id', collab.podcast_two_id).single()
+          ]);
+          return {
+            ...collab,
+            podcast_one_title: p1.data?.title || 'Unknown Podcast',
+            podcast_two_title: p2.data?.title || 'Unknown Podcast'
+          };
+        })
+      );
+      setCollaborations(collabsWithTitles as Collaboration[]);
     }
   };
 
@@ -179,7 +199,7 @@ const CollaborationHub: React.FC = () => {
                     You need at least one public podcast to start collaborating with other creators
                   </p>
                   <Button 
-                    onClick={() => window.location.href = '/'}
+                    onClick={onCreatePodcast}
                     className="mx-auto"
                   >
                     Create Podcast
@@ -326,9 +346,16 @@ const CollaborationHub: React.FC = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Podcast className="w-4 h-4 text-primary" />
-                        <span className="text-sm font-medium">Collaboration</span>
+                        <span className="text-sm font-medium">
+                          {collab.creator_one_id === session?.user.id ? 'Sent' : 'Received'}
+                        </span>
                       </div>
                       {getStatusBadge(collab.status)}
+                    </div>
+                    
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p><span className="font-medium text-foreground">Your podcast:</span> {collab.creator_one_id === session?.user.id ? collab.podcast_one_title : collab.podcast_two_title}</p>
+                      <p><span className="font-medium text-foreground">Collaborator's:</span> {collab.creator_one_id === session?.user.id ? collab.podcast_two_title : collab.podcast_one_title}</p>
                     </div>
                     
                     {collab.status === 'pending' && collab.creator_two_id === session?.user.id && (
@@ -339,7 +366,7 @@ const CollaborationHub: React.FC = () => {
                           size="sm"
                           className="flex-1"
                         >
-                          <Check className="w-4 h-4 mr-2" />
+                          {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
                           Accept
                         </Button>
                         <Button 
@@ -353,6 +380,22 @@ const CollaborationHub: React.FC = () => {
                           Decline
                         </Button>
                       </div>
+                    )}
+                    
+                    {collab.status === 'pending' && collab.creator_one_id === session?.user.id && (
+                      <p className="text-xs text-muted-foreground italic">Waiting for response...</p>
+                    )}
+                    
+                    {collab.status === 'completed' && collab.collab_podcast_id && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => toast.success('Collaborative podcast is in your library!')}
+                      >
+                        <Podcast className="w-4 h-4 mr-2" />
+                        View Merged Podcast
+                      </Button>
                     )}
                   </div>
                 </Card>
