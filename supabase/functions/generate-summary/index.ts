@@ -97,8 +97,9 @@ Format: Number each tweet (1/7, 2/7, etc.)`;
 
   } catch (error) {
     console.error("Error in generate-summary:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
