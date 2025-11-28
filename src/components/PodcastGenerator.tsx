@@ -7,6 +7,9 @@ import ScriptPreview from './ScriptPreview';
 import PodcastLibrary from './PodcastLibrary';
 import PodcastTemplateSelector, { type PodcastTemplate } from './PodcastTemplateSelector';
 import LanguageSelector, { type SupportedLanguage } from './LanguageSelector';
+import TranslatePanel from './TranslatePanel';
+import SmartHighlights from './SmartHighlights';
+import SpatialAudioMixer from './SpatialAudioMixer';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -298,6 +301,22 @@ const PodcastGenerator = () => {
                   estimatedDuration={podcastData.duration || '5:00'} 
                 />
                 <AudioPlayer podcastData={podcastData} onReset={resetGenerator} />
+                
+                {/* AI Enhancement Tools */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <TranslatePanel 
+                    script={podcastData.script}
+                    onTranslated={(translatedScript, lang) => {
+                      console.log('Translated to:', lang);
+                    }}
+                  />
+                  <SmartHighlights 
+                    script={podcastData.script}
+                    title={podcastData.title}
+                  />
+                </div>
+                
+                <SpatialAudioMixer audioUrl={podcastData.audioUrl} />
               </div>
             )}
           </Card>
