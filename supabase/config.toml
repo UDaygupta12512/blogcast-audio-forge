@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.ai-writing]
 verify_jwt = false
+
+[functions.seo-optimizer]
+verify_jwt = false
