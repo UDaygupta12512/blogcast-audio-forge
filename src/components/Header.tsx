@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, LogOut, User, BarChart3, Home, Compass } from 'lucide-react';
+import { Mic, LogOut, User, BarChart3, Home, Compass, PenTool } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -38,6 +38,15 @@ const Header = () => {
               >
                 <Home className="h-4 w-4" />
                 <span className="hidden sm:inline">Home</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/ai-tools')}
+                className={`gap-2 ${location.pathname === '/ai-tools' ? 'bg-purple-500/20' : ''}`}
+              >
+                <PenTool className="h-4 w-4" />
+                <span className="hidden sm:inline">AI Tools</span>
               </Button>
               <Button
                 variant="ghost"
