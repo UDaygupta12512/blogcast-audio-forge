@@ -10,6 +10,7 @@ import LanguageSelector, { type SupportedLanguage } from './LanguageSelector';
 import TranslatePanel from './TranslatePanel';
 import SmartHighlights from './SmartHighlights';
 import SpatialAudioMixer from './SpatialAudioMixer';
+import SEOOptimizer from './SEOOptimizer';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -317,6 +318,11 @@ const PodcastGenerator = () => {
                 </div>
                 
                 <SpatialAudioMixer audioUrl={podcastData.audioUrl} />
+                
+                <SEOOptimizer 
+                  script={podcastData.script}
+                  title={podcastData.title}
+                />
               </div>
             )}
           </Card>
