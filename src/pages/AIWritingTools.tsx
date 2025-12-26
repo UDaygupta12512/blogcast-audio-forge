@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import { useAuth } from '@/hooks/useAuth';
-import { Loader2, PenTool, FileText, Share2, Mail, Sparkles, ArrowLeft } from 'lucide-react';
+import { Loader2, PenTool, FileText, Share2, Mail, Sparkles, ArrowLeft, Library } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,11 +10,12 @@ import BlogGenerator from '@/components/ai-tools/BlogGenerator';
 import SocialCaptionGenerator from '@/components/ai-tools/SocialCaptionGenerator';
 import EmailWriter from '@/components/ai-tools/EmailWriter';
 import ContentRepurposer from '@/components/ai-tools/ContentRepurposer';
+import TemplateLibrary from '@/components/ai-tools/TemplateLibrary';
 
 const AIWritingTools = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('blog');
+  const [activeTab, setActiveTab] = useState('templates');
 
   React.useEffect(() => {
     if (!loading && !user) {
@@ -33,10 +34,11 @@ const AIWritingTools = () => {
   if (!user) return null;
 
   const tools = [
+    { id: 'templates', label: 'Templates', icon: Library, description: 'Pre-made templates for quick starts' },
     { id: 'blog', label: 'Blog Generator', icon: FileText, description: 'Generate SEO-optimized blog posts' },
     { id: 'social', label: 'Social Captions', icon: Share2, description: 'Create viral social media content' },
     { id: 'email', label: 'Email Writer', icon: Mail, description: 'Craft professional emails' },
-    { id: 'repurpose', label: 'Content Repurposer', icon: Sparkles, description: 'Transform podcasts into blogs, newsletters & more' },
+    { id: 'repurpose', label: 'Repurposer', icon: Sparkles, description: 'Transform podcasts into blogs & more' },
   ];
 
   return (
@@ -60,7 +62,7 @@ const AIWritingTools = () => {
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+            <TabsList className="grid w-full grid-cols-5 max-w-3xl">
               {tools.map((tool) => (
                 <TabsTrigger key={tool.id} value={tool.id} className="flex items-center gap-2">
                   <tool.icon className="w-4 h-4" />
@@ -70,6 +72,9 @@ const AIWritingTools = () => {
             </TabsList>
 
             <div className="mt-8">
+              <TabsContent value="templates">
+                <TemplateLibrary />
+              </TabsContent>
               <TabsContent value="blog">
                 <BlogGenerator />
               </TabsContent>
