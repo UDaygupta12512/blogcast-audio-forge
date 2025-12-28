@@ -5,15 +5,23 @@ import { Card } from '@/components/ui/card';
 import { Play, Pause, Download, Share2, RotateCcw, Subtitles, Volume2, VolumeX } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import AudioControls from './AudioControls';
+import AudioWaveform from './AudioWaveform';
+import ChapterMarkers, { type Chapter } from './ChapterMarkers';
+import SocialClipGenerator from './SocialClipGenerator';
+import SummaryGenerator from './SummaryGenerator';
 import { FreeTTSService } from '../services/freeTtsService';
+import { generateChapters } from '@/utils/chapterGenerator';
+import { trackPodcastEvent } from '@/utils/analyticsTracker';
 import type { PodcastData } from './PodcastGenerator';
 
 interface AudioPlayerProps {
   podcastData: PodcastData;
   onReset: () => void;
+  podcastId?: string;
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset, podcastId }) => {
+  const playStartTimeRef = useRef<number>(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -27,11 +35,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
   const [showControls, setShowControls] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [speechError, setSpeechError] = useState<string | null>(null);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
   const ttsServiceRef = useRef<FreeTTSService | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedAtRef = useRef<number>(0);
   const { toast } = useToast();
+
+  // Generate chapters from script
+  useEffect(() => {
+    if (podcastData.script && duration > 0) {
+      const generatedChapters = generateChapters(podcastData.script, duration);
+      setChapters(generatedChapters);
+    }
+  }, [podcastData.script, duration]);
 
   // Initialize TTS service with better error handling
   useEffect(() => {
@@ -123,6 +140,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
       pausedAtRef.current = currentTime;
       setIsLoading(false);
       setSpeechError(null);
+      
+      // Track pause event
+      if (podcastId) {
+        const listenDuration = Math.floor(currentTime - playStartTimeRef.current);
+        trackPodcastEvent(podcastId, 'pause', listenDuration);
+      }
     } else {
       try {
         setIsLoading(true);
@@ -142,6 +165,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         
         setIsPlaying(true);
         setIsPaused(false);
+        playStartTimeRef.current = currentTime;
+        
+        // Track play event
+        if (podcastId) {
+          trackPodcastEvent(podcastId, 'play', 0);
+        }
         
         // If resuming, don't reset current time
         if (!isPaused) {
@@ -165,6 +194,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         console.log('✅ Speech synthesis completed successfully');
         setIsPlaying(false);
         setIsPaused(false);
+        
+        // Track completion
+        if (podcastId) {
+          trackPodcastEvent(podcastId, 'complete', Math.floor(currentTime));
+        }
+        
         setCurrentTime(0);
         
         toast({
@@ -269,6 +304,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
     link.click();
     URL.revokeObjectURL(url);
     
+    // Track download event
+    if (podcastId) {
+      trackPodcastEvent(podcastId, 'download', 0);
+    }
+    
     toast({
       title: "Script Downloaded! 📄",
       description: "Your podcast script has been saved to your downloads.",
@@ -277,6 +317,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
 
   const handleShare = () => {
     navigator.clipboard.writeText(podcastData.script);
+    
+    // Track share event
+    if (podcastId) {
+      trackPodcastEvent(podcastId, 'share', 0);
+    }
+    
     toast({
       title: "Script Copied! 📋",
       description: "Podcast script copied to clipboard - ready to share!",
@@ -520,6 +566,29 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
         </div>
       )}
 
+      {/* Audio Waveform Visualizer */}
+      <AudioWaveform 
+        isPlaying={isPlaying && !isPaused} 
+        currentTime={currentTime} 
+        duration={duration} 
+      />
+
+      {/* Chapter Markers */}
+      {chapters.length > 0 && (
+        <ChapterMarkers 
+          chapters={chapters} 
+          currentTime={currentTime}
+          onSeek={(time) => {
+            pausedAtRef.current = time;
+            setCurrentTime(time);
+            if (isPlaying) {
+              togglePlayback(); // pause
+              setTimeout(() => togglePlayback(), 100); // resume at new position
+            }
+          }}
+        />
+      )}
+
       {/* Enhanced Action Buttons */}
       <div className="flex flex-wrap gap-4 justify-center">
         <Button 
@@ -546,6 +615,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ podcastData, onReset }) => {
           <RotateCcw className="w-4 h-4" />
           Create Another
         </Button>
+      </div>
+
+      {/* Social Clip Generator */}
+      <div className="mt-6">
+        <SocialClipGenerator 
+          podcastId={podcastId || ''}
+          script={podcastData.script}
+          audioUrl={podcastData.audioUrl}
+          duration={podcastData.duration || ''}
+        />
+      </div>
+
+      {/* Summary Generator */}
+      <div className="mt-6">
+        <SummaryGenerator 
+          podcastId={podcastId || ''}
+          script={podcastData.script}
+          title={podcastData.title}
+        />
       </div>
     </div>
   );

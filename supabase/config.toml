@@ -1,0 +1,19 @@
+project_id = "qonjazlqjrtsokupodtf"
+
+[functions.merge-podcasts]
+verify_jwt = true
+
+[functions.translate-podcast]
+verify_jwt = false
+
+[functions.smart-highlights]
+verify_jwt = false
+
+[functions.generate-summary]
+verify_jwt = false
+
+[functions.ai-writing]
+verify_jwt = false
+
+[functions.seo-optimizer]
+verify_jwt = false

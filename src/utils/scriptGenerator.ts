@@ -1,5 +1,6 @@
 
 import type { ParsedContent } from './contentParser';
+import type { PodcastTemplate } from '@/components/PodcastTemplateSelector';
 
 export interface ScriptGenerationOptions {
   voice: string;
@@ -7,34 +8,73 @@ export interface ScriptGenerationOptions {
   includeIntro: boolean;
   includeOutro: boolean;
   maxDuration: number; // in minutes
+  template?: PodcastTemplate;
+  language?: string;
 }
+
+const TEMPLATE_STYLES: Record<PodcastTemplate, { intro: string; style: string; outro: string }> = {
+  standard: {
+    intro: "Welcome to today's podcast.",
+    style: "professional and engaging",
+    outro: "Thank you for listening. Until next time!"
+  },
+  interview: {
+    intro: "Welcome! Today we have a fascinating discussion.",
+    style: "conversational Q&A format",
+    outro: "Great conversation today. Thanks for joining!"
+  },
+  news: {
+    intro: "Breaking news on today's most important story.",
+    style: "urgent and informative",
+    outro: "Stay informed. That's all for now!"
+  },
+  storytelling: {
+    intro: "Settle in for today's captivating story.",
+    style: "narrative and dramatic",
+    outro: "And that concludes our story."
+  },
+  educational: {
+    intro: "Let's learn something new today.",
+    style: "clear explanations with examples",
+    outro: "Hope you learned something valuable!"
+  },
+  conversational: {
+    intro: "Hey! Let's chat about something cool.",
+    style: "casual and friendly",
+    outro: "Great chat! Catch you later!"
+  }
+};
 
 export const generatePodcastScript = (
   content: ParsedContent,
   options: ScriptGenerationOptions
 ): string => {
+  const template = options.template || 'standard';
+  const templateStyle = TEMPLATE_STYLES[template];
   const { title, content: articleContent, metadata, contentType } = content;
   
   // Create personalized intros based on actual content
   const getIntro = (): string => {
+    const baseIntro = templateStyle.intro;
     const personalizedIntros = {
-      aria: `Hello everyone, and welcome back to our podcast! I'm Aria, your host for today's deep dive into "${title}". This ${metadata.readingTime} piece has some absolutely fascinating insights that I think will really change how you think about this topic. So grab your favorite beverage, get comfortable, and let's explore this together. Today's discussion is going to be particularly engaging because we're covering some cutting-edge ideas that are shaping our understanding of this field.`,
-      sarah: `Good day, listeners. I'm Sarah, and this is our detailed briefing on "${title}". Today we'll be conducting a thorough analysis of this ${contentType} content, breaking down the key concepts and examining their broader implications. This isn't just surface-level coverage - we're going deep into the subject matter to understand what makes this topic so significant and why it deserves our attention right now.`,
-      charlie: `Hey there, amazing listeners! Charlie here, and I am absolutely pumped to share "${title}" with you today! This is going to be one of those episodes where we really dig into the nitty-gritty details and explore some game-changing concepts. I've been looking forward to discussing this ${contentType} because it touches on so many important themes that I know resonate with our community. So let's jump right in and unpack everything together!`,
-      laura: `Welcome, dear friends. I'm Laura, and today we're taking a mindful, thoughtful journey through "${title}". In our fast-paced world, it's so important to slow down and really absorb the wisdom contained in quality content like this. This ${metadata.readingTime} exploration offers us an opportunity to reflect deeply on ideas that can genuinely transform our perspective. Let's approach this with curiosity and openness, allowing these insights to settle in naturally.`,
-      george: `Greetings, valued listeners. George here with today's comprehensive analysis of "${title}". We'll be examining this ${contentType} content through a strategic lens, methodically breaking down each component to understand its full significance. This systematic approach will help us extract maximum value from the material and apply these insights practically in our own contexts.`
+      aria: `${baseIntro} I'm Aria, and we're exploring "${title}" in a ${templateStyle.style} way. This ${metadata.readingTime} piece has fascinating insights!`,
+      sarah: `${baseIntro} I'm Sarah with "${title}". We'll analyze this ${contentType} content ${templateStyle.style}.`,
+      charlie: `${baseIntro} Charlie here! "${title}" is going to be amazing. We're doing this ${templateStyle.style}!`,
+      laura: `${baseIntro} I'm Laura. Today's journey through "${title}" will be ${templateStyle.style}.`,
+      george: `${baseIntro} George here. "${title}" - examined ${templateStyle.style}.`
     };
 
     return personalizedIntros[options.voice as keyof typeof personalizedIntros] || personalizedIntros.aria;
   };
 
   const getOutro = (): string => {
+    const baseOutro = templateStyle.outro;
     const personalizedOutros = {
-      aria: `And that brings us to the end of our exploration of "${title}". I hope you found this journey as enlightening as I did! These insights really showcase how much depth there is in quality content when we take the time to properly digest it. Thank you so much for joining me today, and I'd love to hear your thoughts on this topic. Don't forget to share this episode if you found it valuable, and I'll see you in the next one where we'll continue exploring fascinating ideas together!`,
-      sarah: `That concludes our comprehensive briefing on "${title}". We've covered significant ground today, examining multiple facets of this important topic. The analysis we've conducted should provide you with a solid foundation for further exploration. Stay informed, keep questioning, and continue seeking out quality content. This is Sarah, signing off until our next detailed discussion.`,
-      charlie: `And that's a fantastic wrap on "${title}"! Wow, what a journey we've been on together! I hope you're as excited about these ideas as I am. The innovations and insights we've discussed today really highlight how dynamic and evolving this field is. Keep that curiosity burning bright, keep pushing boundaries, and remember - the best discoveries often come from the most unexpected places. Catch you in the next episode, where we'll continue our adventure into amazing ideas!`,
-      laura: `Thank you for walking this path of discovery with me as we explored "${title}". These moments of deep reflection and learning are such gifts in our lives. May the insights we've shared today serve you well on your own journey of growth and understanding. Take time to let these ideas percolate, and remember that wisdom often reveals itself gradually. Take care of yourselves, and until we meet again for our next mindful exploration.`,
-      george: `This concludes our systematic examination of "${title}". The strategic insights we've analyzed today provide a comprehensive framework for understanding this topic's significance. I recommend taking time to consider how these concepts might be applied within your own operational context. Thank you for your focused attention during today's session. Apply these insights judiciously and systematically.`
+      aria: `${baseOutro} Thanks for exploring "${title}" with me! Share if you found it valuable!`,
+      sarah: `${baseOutro} We've covered "${title}" comprehensively. This is Sarah, signing off.`,
+      charlie: `${baseOutro} What a journey through "${title}"! Keep that curiosity alive!`,
+      laura: `${baseOutro} Thank you for this mindful journey through "${title}".`,
+      george: `${baseOutro} "${title}" examined systematically. Apply these insights wisely.`
     };
 
     return personalizedOutros[options.voice as keyof typeof personalizedOutros] || personalizedOutros.aria;
